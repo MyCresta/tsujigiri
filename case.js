@@ -152,7 +152,7 @@ window.CASEFILE = {
       title: "A space between sounds",
       kicker: "The storm watch",
       brief: "Four relief officers had reason to speak to the copyist about his figures. In the dark, nobody looked at a clock. The people along the river marked the night by the work they did and the sounds that carried over the water.",
-      event: "Isuke, the youngest porter, arrives with two different sandals on. He put them on in the dark when Tomo called. He has brought his sister’s sewing basket because it belongs in the account he is about to give.",
+      event: "Isuke, the youngest porter, arrives with two different sandals on. He put them on in the dark when Tomo called. He sets his sister’s sewing basket on the table. Tomo found it under the bridge bench and brought it back to the inn.",
       items: [
         {
           id: "gate-witness", kind: "witness", title: "Isuke and the sewing basket", subtitle: "Relay porter · Last sighting",
@@ -250,7 +250,7 @@ window.CASEFILE = {
           id: "counterfoils", kind: "document", title: "Four counterfoils", subtitle: "Pay desk · The clerk’s register",
           caption: "Descriptions of the four torn edges, all read down from their knot holes.",
           body: [
-            "Officers keep their torn pay slips on their purse cords until the week’s accounts close. Each mark identifies a voucher. All four are for the same sum. To link a voucher to its bearer, the headman asks for a witness who actually saw him carry it.",
+            "Officers keep their torn pay slips on their purse cords until the week’s accounts close. Each mark identifies a voucher. All four are for the same sum. The register records the purpose claimed for each payment. Ume can say how one torn half came to be at the bridge.",
             "The following sheet gives the purpose entered by the collector. Pair the tear and the fibre before looking up the matching mark."
           ],
           table: { head: ["Mark", "Turns from the top", "Blue fibre"], rows: [
@@ -288,7 +288,7 @@ window.CASEFILE = {
           "Both Daigo and Iori have the left-brow scar. Only one could have been on the bridge. The slip needs an IN, OUT, OUT edge with a blue fibre at the middle turn.",
           "Daigo was at the Rice Store. Iori fits the sighting and the interval. The Crane counterfoil fits the paper. Read its purpose against the Kite delivery."
         ],
-        success: "The clerk sets the Crane half against the paper from Sōhei’s hand. The blue fibre joins. He writes Iori’s name beside the payment, then turns the book so Ume can see."
+        success: "The clerk sets the Crane half against the paper from Sōhei’s hand. The blue fibre joins. He records that Ume saw the slip come from Iori’s purse. Then he turns the book so she can see."
       }
     }
   ],

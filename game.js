@@ -54,7 +54,7 @@
       for (const k of ['drafts', 'hints']) {
         if (saved[k] && typeof saved[k] === 'object' && !Array.isArray(saved[k])) state[k] = saved[k];
       }
-    } catch { /* A fresh in-memory case also works with unavailable storage. */ }
+    } catch { persistent = false; }
   }
 
   function save() {
@@ -74,7 +74,10 @@
 
   function focusHeading(id = 'g-heading', scroll = true) {
     const el = document.getElementById(id);
-    if (el) el.focus({ preventScroll: !scroll });
+    if (el) {
+      el.focus({ preventScroll: true });
+      if (scroll) el.scrollIntoView({ block: 'start' });
+    }
   }
 
   function addDialog() {
@@ -154,6 +157,9 @@
       '<button class="g-tool g-title-link" data-ga="title">Title screen</button></div></header><div class="g-frame">' + chapterNav() + (state.view === 'intro' ? intro() : state.view === 'ending' ? ending() : desk()) +
       '<footer class="g-foot"><span>Kageura Crossing</span><span>' + (persistent ? 'Progress saved on this device' : 'Storage unavailable · Progress lasts for this session') +
       '</span></footer></div><div class="g-notice" role="status" hidden></div></div>';
+    for (const field of game.querySelectorAll('#g-answer-form select[data-field]')) {
+      field.value = state.drafts[state.chapter]?.[field.dataset.field] || '';
+    }
   }
 
   function soundButton() {
@@ -216,20 +222,21 @@
       return '<section class="g-finding" id="g-deduction"><span class="g-finding-icon">' + icon('check') + '</span><div><p class="g-label">Finding entered</p><h2 id="g-deduction-heading" tabindex="-1">' + esc(puzzle.title) + '</h2><div class="g-prose">' + paragraphs(puzzle.success) +
         '</div><button class="g-primary" data-ga="' + (last ? 'ending' : 'chapter') + '" data-index="' + (i + 1) + '">' + (last ? 'Read the closing entry' : 'Open chapter ' + (roman[i + 1] || i + 2)) + '</button></div></section>';
     }
-    const drafts = state.drafts[i] || {};
     const shown = Math.min(puzzle.hints?.length || 0, Math.max(0, Number(state.hints[i]) || 0));
     return '<section class="g-deduction" id="g-deduction"><div class="g-deduction-intro"><p class="g-label g-red">Joint deduction</p><h2 id="g-deduction-heading" tabindex="-1">' + esc(puzzle.title) + '</h2><div class="g-prose">' + paragraphs(puzzle.prompt) + '</div>' +
       (puzzle.hints?.length ? '<div class="g-hints"><h3>Field hints</h3><ol>' + puzzle.hints.slice(0, shown).map(h => '<li>' + esc(h) + '</li>').join('') + '</ol>' +
         (shown < puzzle.hints.length ? '<button class="g-text-button" data-ga="hint">' + (shown ? 'Reveal the next hint' : 'Reveal a first hint') + '</button>' : '<span class="g-hint-end">All hints opened</span>') + '</div>' : '') +
       '</div><form class="g-fields" id="g-answer-form">' + puzzle.fields.map((f, j) => '<div><label for="g-answer-' + j + '">' + esc(f.label) + '</label><select required data-field="' + esc(f.id) + '" id="g-answer-' + j + '"><option value="">Select a finding</option>' +
-        f.options.map(o => '<option value="' + esc(o) + '"' + (drafts[f.id] === o ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select></div>').join('') +
+        f.options.map(o => '<option value="' + esc(o) + '">' + esc(o) + '</option>').join('') + '</select></div>').join('') +
       '<p class="g-feedback" role="status" id="g-feedback"></p><button class="g-primary" type="submit">Enter this deduction</button></form></section>';
   }
 
-  function readItemBody(item) {
-    return (item.asset ? '<figure class="g-reader-figure' + (item.kind === 'map' ? ' g-map-figure' : '') + '">' + visual(item, true) +
+  function readItemBody(item, withTools = false) {
+    const route = withTools && item.id === 'town-plan' && typeof window.mountRouteTool === 'function';
+    const paper = withTools && item.id === 'wrapper' && typeof window.mountPaperTool === 'function';
+    return (item.asset ? '<figure class="g-reader-figure' + (item.kind === 'map' ? ' g-map-figure' : '') + '">' + (route ? '<div class="g-route-mount"></div>' : visual(item, true)) +
       (item.caption ? '<figcaption>' + esc(item.caption) + '</figcaption>' : '') + '</figure>' : item.caption ? '<p class="g-source-line">' + esc(item.caption) + '</p>' : '') +
-      '<div class="g-prose g-evidence-prose">' + paragraphs(item.body) + '</div>' + (item.table ? '<div class="g-table-region" role="region" aria-label="' + esc(item.title) + ' table" tabindex="0"><table><thead><tr>' +
+      '<div class="g-prose g-evidence-prose">' + paragraphs(item.body) + '</div>' + (paper ? '<div class="g-paper-mount"></div>' : '') + (item.table ? '<div class="g-table-region" role="region" aria-label="' + esc(item.title) + ' table" tabindex="0"><table><thead><tr>' +
         item.table.head.map(h => '<th scope="col">' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
         item.table.rows.map(row => '<tr>' + row.map((cell, k) => k === 0 ? '<th scope="row">' + esc(cell) + '</th>' : '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '');
   }
@@ -243,16 +250,20 @@
     if (marker) marker.textContent = 'Examined';
     const items = getCase().acts[a].items;
     openDialog(modalHead('Chapter ' + (roman[a] || a + 1) + '  /  ' + (kindNames[item.kind] || 'Exhibit'), item.title) +
-      (item.subtitle ? '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p>' : '') + '<div class="g-reader-content">' + readItemBody(item) +
+      (item.subtitle ? '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p>' : '') + '<div class="g-reader-content">' + readItemBody(item, true) +
       '</div><footer class="g-reader-tail">' + pinButton(key) + '<div>' + (i ? '<button class="g-secondary" data-ga="reader" data-key="' + a + '.' + (i - 1) + '">Previous exhibit</button>' : '') +
       (i < items.length - 1 ? '<button class="g-secondary" data-ga="reader" data-key="' + a + '.' + (i + 1) + '">Next exhibit</button>' : '') +
       '</div></footer><div class="g-notice" role="status" hidden></div>', 'g-reader-dialog');
+    const routeSlot = dialog.querySelector('.g-route-mount');
+    if (routeSlot) window.mountRouteTool(routeSlot, state);
+    const paperSlot = dialog.querySelector('.g-paper-mount');
+    if (paperSlot) window.mountPaperTool(paperSlot);
   }
 
   function showComparison() {
     const selected = state.compare.map(key => ({ key, item: getItem(key) })).filter(x => x.item);
-    const content = selected.map(({ item }) => '<article class="g-compare-exhibit"><p class="g-label g-red">' + esc(kindNames[item.kind]) + '</p><h3>' + esc(item.title) +
-      '</h3>' + (item.subtitle ? '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p>' : '') + readItemBody(item) + '</article>').join('');
+    const content = selected.map(({ key, item }) => '<article class="g-compare-exhibit"><p class="g-label g-red">' + esc(kindNames[item.kind]) + '</p><h3>' + esc(item.title) +
+      '</h3>' + (item.subtitle ? '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p>' : '') + readItemBody(item) + '<div class="g-compare-pin">' + pinButton(key) + '</div></article>').join('');
     openDialog(modalHead('The investigation desk', 'Compare exhibits') + (selected.length < 2 ? '<p class="g-comparison-help">Pin two exhibits in the evidence register to read them side by side. Pins carry across chapters.</p>' : '') +
       '<div class="g-compare-columns">' + content + '</div>', 'g-wide-dialog');
   }
@@ -268,6 +279,7 @@
       btn.setAttribute('aria-pressed', String(on));
       btn.querySelector('span').textContent = on ? 'Pinned' : 'Pin exhibit';
     }
+    if (dialog?.open && dialog.classList.contains('g-wide-dialog')) showComparison();
     const button = getGame().querySelector('.g-compare-btn span');
     if (button) button.textContent = 'Compare exhibits' + (state.compare.length ? ' (' + state.compare.length + '/2)' : '');
   }
@@ -381,5 +393,6 @@
   document.addEventListener('submit', submitDeduction);
   window.openInvestigation = openInvestigation;
   window.openNotebook = notebook;
+  window.clearSavedInvestigation = () => { state = defaultState(); save(); returnToTitle(); };
   window.hasInvestigation = () => { load(); return state.started; };
 })();

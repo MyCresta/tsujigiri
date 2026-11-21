@@ -11,6 +11,10 @@
   <link rel="preload" href="./assets/fonts/cormorant-semibold.woff" as="font" type="font/woff" crossorigin>
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./game.css">
+  <link rel="stylesheet" href="./route.css">
+  <link rel="stylesheet" href="./paper.css">
+  <script defer src="./route.js"></script>
+  <script defer src="./paper.js"></script>
   <script defer src="./case.js"></script>
   <script defer src="./game.js"></script>
   <script defer src="./title.js"></script>
@@ -49,6 +53,7 @@
         <button class="enter-case" id="begin" type="button"><svg class="ico"><use href="#i-book"/></svg><span>Begin investigation</span></button>
         <button class="guide-action" id="how" type="button"><svg class="ico"><use href="#i-guide"/></svg>How to play</button>
       </div>
+      <div class="saved-case-options" id="saved-options" hidden><button type="button" id="new-case">Start a fresh case</button></div>
     </div>
   </main>
   <footer class="title-foot">
@@ -74,6 +79,14 @@
     </ol>
     <p class="guide-save"><svg class="ico"><use href="#i-book"/></svg>Your case and notebook save in this browser. Take as long as you need.</p>
     <button class="enter-case guide-return" type="button" id="guide-return">Return to case cover</button>
+  </div>
+</dialog>
+<dialog class="field-guide" id="new-case-dialog" aria-labelledby="new-case-heading">
+  <div class="guide-inner reset-inner">
+    <p class="guide-kicker">Case archive</p>
+    <h2 id="new-case-heading">Start a fresh case?</h2>
+    <p>This will clear the current team’s findings, notebook, and pins from this browser.</p>
+    <div class="reset-actions"><button class="keep-case" id="keep-case" type="button">Keep current case</button><button type="button" class="enter-case" id="confirm-new">Clear and start fresh</button></div>
   </div>
 </dialog>
 <p class="status-toast" role="status" id="title-status" hidden></p>

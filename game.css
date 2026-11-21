@@ -53,7 +53,7 @@ body.g-modal-open { overflow: hidden; }
 }
 .g-wordmark { display: inline-flex; align-items: center; gap: .75rem; background: none; border: none; padding: .2rem 0; }
 #game .g-wordmark>span:last-child { font: 600 2rem/1 var(--serif,Georgia,serif); letter-spacing: -.035em; }
-.g-mon { display: inline-flex; width: 2.1rem; height: 2.1rem; align-items: center; justify-content: center; color:#f2e2c5; background:#903a29; }
+.g-mon { display: inline-flex; width: 2.1rem; height: 2.1rem; align-items: center; justify-content: center; color:#f2e2c5; }
 .g-mon img { width: 100%; height: 100%; }
 .g-mast-caption { border-left: 1px solid #646658; padding-left: 1.15rem; color:#c8c7b9; font-size: .84rem; }
 .g-tools { margin-left: auto; display: flex; align-items: center; gap: .6rem; }
@@ -186,6 +186,8 @@ body.g-modal-open { overflow: hidden; }
 .g-dialog.g-wide-dialog { width:min(83rem,calc(100vw - 2.5rem)); }
 .g-compare-columns { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); gap:clamp(1rem,3vw,2.3rem); margin-top:1.2rem; }
 .g-compare-exhibit+article { border-left:1px solid var(--g-rule); padding-left:clamp(1rem,3vw,2.3rem); }
+.g-compare-pin { margin-top:.8rem; padding-top:.45rem; border-top:1px solid var(--g-rule); }
+#g-deduction-heading { scroll-margin-top:2rem; }
 .g-compare-exhibit h3 { margin:.35rem 0 .65rem !important; font-size:2rem; }
 .g-compare-exhibit .g-reader-figure { margin:.8rem 0 !important; }
 .g-comparison-help,.g-notes,.g-reset { margin-top:1.2rem !important; }

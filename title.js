@@ -85,6 +85,7 @@
 
   function refreshCover() {
     const hasSave = window.hasInvestigation?.();
+    document.querySelector('#saved-options').hidden = !hasSave;
     begin.querySelector('span').textContent = hasSave ? 'Resume investigation' : 'Begin investigation';
   }
 
@@ -98,6 +99,16 @@
 
   begin.addEventListener('click', () => window.openInvestigation());
   sound.addEventListener('click', window.toggleAmbience);
+  const resetDialog = document.querySelector('#new-case-dialog');
+  document.querySelector('#new-case').addEventListener('click', () => {
+    resetDialog.showModal();
+    document.querySelector('#keep-case').focus();
+  });
+  document.querySelector('#keep-case').addEventListener('click', () => resetDialog.close());
+  document.querySelector('#confirm-new').addEventListener('click', () => {
+    resetDialog.close();
+    window.clearSavedInvestigation();
+  });
   document.querySelector('#how').addEventListener('click', () => {
     guide.showModal();
     document.querySelector('#close-guide').focus({ preventScroll: true });

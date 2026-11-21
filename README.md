@@ -12,6 +12,10 @@ Open the case on one screen and choose **Begin investigation**. The field guide 
 
 From this directory, run `python3 -m http.server 8000` and open `http://localhost:8000/`. All game code, illustrations, and fonts are included. The site runs as static files and uses relative URLs for GitHub Pages project hosting.
 
+## Publish updates
+
+GitHub Pages serves the root of the `gh-pages` branch. After testing a change on `main`, run `git push origin main main:gh-pages` to update the source and the live game together.
+
 ## Credits
 
 The story, map, evidence, interface, and woodblock-inspired illustrations were created for this game. The game includes historical background and links to references. Cormorant Garamond, DM Sans, and the Noto Serif JP title glyphs are distributed under the SIL Open Font License. The license texts are included in the fonts directory.
