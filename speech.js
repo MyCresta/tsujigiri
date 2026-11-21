@@ -3,6 +3,7 @@
   'use strict';
 
   const preferenceKey = 'tsujigiri.voice.v1';
+  const recordingEdition = 'guided-cast-1';
   const cues = new Set();
   const file = window.CASEFILE;
   file.intro.forEach((_, i) => cues.add('prologue-' + (i + 1)));
@@ -45,7 +46,7 @@
   async function play(id) {
     if (!cues.has(id)) return false;
     stop();
-    const audio = new Audio('./assets/voice/' + id + '.mp3');
+    const audio = new Audio('./assets/voice/' + id + '.mp3?v=' + recordingEdition);
     const line = { id, audio };
     active = line;
     function finished() {

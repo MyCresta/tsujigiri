@@ -83,9 +83,10 @@
     }));
     const id = 'pt-' + ++nextId;
     container.innerHTML = '<section class="pt-tool" aria-labelledby="' + id + '-title">' +
-      '<h3 id="' + id + '-title">Fit the torn paper</h3><p class="pt-help">Choose a counterfoil, then slide it against the recovered slip. Keep both knot holes at the top.</p>' +
+      '<h3 id="' + id + '-title">Fit the torn paper</h3><p class="pt-help">Choose a counterfoil, the half kept by the pay desk. Drag the papers together or use the button. Look for a continuous edge and a blue fibre that runs across the join.</p>' +
       '<div class="pt-controls"><label>Counterfoil <select></select></label><button type="button" class="g-secondary pt-toggle">Bring edges together</button></div>' +
       '<div class="pt-tray"><svg viewBox="0 0 700 295" aria-hidden="true" focusable="false"></svg></div>' +
+      '<div class="pt-labels" aria-hidden="true"><span>Recovered slip</span><span class="pt-desk-label"></span></div>' +
       '<p class="pt-status" aria-live="polite"></p>' +
       '<details class="pt-descriptions"><summary>Read the edge descriptions</summary><p>On the recovered slip the turns go out, in, then in, reading down from the knot hole. The blue fibre crosses the middle turn.</p><p class="pt-candidate"></p></details></section>';
     const select = container.querySelector('select');
@@ -112,6 +113,7 @@
 
     function display() {
       selected = candidates[select.selectedIndex];
+      container.querySelector('.pt-desk-label').textContent = 'Pay desk · ' + selected.name;
       svg.innerHTML = drawing(id, selected);
       const which = ['top', 'middle', 'bottom'][selected.fibre];
       caption.textContent = selected.name + ' has the following turns from the top. ' + selected.directions.join(' · ').toLowerCase() + '. The blue fibre crosses the ' + which + ' turn.';

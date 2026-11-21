@@ -6,9 +6,13 @@ A shared-screen murder mystery for two to four players. In a fictional Japanese 
 
 ## At the table
 
-Open the game on one screen. It starts at the Reed Inn, or resumes the team’s saved scene. Select a mark on the artwork to speak to a witness or inspect an object. On narrower screens, swipe or use the side controls to look around.
+Open the game on one screen. At the Reed Inn, the headman explains why he needs you and gives you a first lead. Select **Start investigating** to enter the room. Returning players resume their saved scene. Select **Field guide** in any scene to read the opening story, learn how to play together, or revisit the current assignment.
 
-**Casebook** gathers unlocked evidence for comparison. **Notebook** saves shared observations, and **Make finding** records the team’s answer. Use the spoken narration control to hear objectives, witness dialogue, and story beats. Select **Listen** to replay a single line. Rain has its own switch. Hints are optional. The pause menu holds the field guide, replay, and appearance settings. The night palette follows the device by default.
+Select a mark on the artwork to speak to a witness or inspect an object. Each exhibit explains **Why it matters** and **What to look for**. Read or listen through a witness’s final line to complete the interview. On narrower screens, swipe or use the side controls to look around.
+
+Pin two exhibits in the **Casebook** to compare them. Use the **Notebook** for your group’s working theory. When you agree on what the evidence supports, select **Make finding**. You can revise your choices or ask for a hint.
+
+Turn on spoken narration to hear objectives, individually voiced witnesses, and story passages. Select **Listen** to replay a line. The pause menu holds the rain and appearance controls. The night palette follows the device by default.
 
 Press **F** for browser fullscreen, **B** for the casebook, **N** for notes, or **Escape** to close a panel or open the pause menu.
 

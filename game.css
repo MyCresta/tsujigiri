@@ -309,3 +309,41 @@
 .voice-objective .g-icon { width:14px;height:14px; }
 .voice-objective:is(:hover,.is-speaking) { color:#fff0cc;border-color:#ddae76;background:#754a32; }
 @media(max-width:580px) { .scene-objective { align-items:flex-start; } .voice-objective { width:28px;height:28px; } }
+
+/* Keep the guide named on small screens, where a row of icons alone is ambiguous. */
+.scene-actions .scene-guide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 41px;
+  padding: 8px 13px;
+  border: 1px solid #b69c70c9;
+  border-radius: 2px;
+  color: #f6e7c9;
+  background: #20241fdb;
+  box-shadow: inset 0 0 0 2px #1c211aaa, 0 2px 6px #11150c60;
+  font: 600 13px/1.2 var(--sans);
+  white-space: nowrap;
+}
+.scene-guide .g-icon { height: 16px; width: 16px; }
+.scene-guide:hover { border-color: #ead2a3; background: #38392bf2; }
+.hotspot.is-partial:not(.is-seen) .hotspot-dot::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid #ebcd99;
+  background: linear-gradient(90deg, #c47b50 50%, #272a21 50%);
+}
+.progress-marks i.is-partial:not(.is-seen) { background: linear-gradient(90deg,#d6a26e 50%,#20251c 50%); }
+@media (max-width:720px) {
+  .scene-actions .scene-guide { min-height: 36px; padding: 6px 9px; font-size:12px; }
+}
+@media (max-width:580px) and (orientation:portrait) {
+  .scene-actions { display:grid;grid-template-columns:repeat(3,36px);column-gap:5px;row-gap:7px; }
+  .scene-actions .scene-guide { grid-column:1/-1;grid-row:2; }
+}

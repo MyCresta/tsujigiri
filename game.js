@@ -36,7 +36,7 @@
   const getGame = () => document.getElementById('game');
   const defaultState = () => ({
     started: false, view: 'desk', chapter: 0, solved: 0, notes: '',
-    seen: [], compare: [], hints: {}, drafts: {}
+    seen: [], compare: [], hints: {}, drafts: {}, briefed: [], witnessPages: {}
   });
   let state;
   let dialog;
@@ -61,6 +61,21 @@
       state.compare = Array.isArray(saved.compare) ? [...new Set(saved.compare.filter(k => getItem(k)))].slice(0, 2) : [];
       for (const k of ['drafts', 'hints']) {
         if (saved[k] && typeof saved[k] === 'object' && !Array.isArray(saved[k])) state[k] = saved[k];
+      }
+      for (const [key, page] of Object.entries(saved.witnessPages || {})) {
+        const item = getItem(key);
+        if (item?.kind === 'witness' && !state.seen.includes(key) && Number.isInteger(page) && page >= 0 && page < item.body.length - 1) {
+          state.witnessPages[key] = page;
+        }
+      }
+      if (Array.isArray(saved.briefed)) {
+        state.briefed = [...new Set(saved.briefed.filter(i => Number.isInteger(i) && i >= 0 && i < count && i <= state.solved))];
+      } else {
+        // The previous edition created a save on arrival, before a player took any action.
+        const hasPicks = Object.values(state.drafts).some(fields => fields && Object.values(fields).some(v => typeof v === 'string' && v.trim()));
+        const hasProgress = state.chapter > 0 || state.solved > 0 || state.seen.length || state.compare.length || state.notes.trim() ||
+          Object.values(state.hints).some(n => Number(n) > 0) || hasPicks;
+        if (hasProgress) state.briefed = getCase().acts.map((_, i) => i).filter(i => i <= state.solved);
       }
     } catch { persistent = false; }
   }
@@ -115,6 +130,7 @@
   }
 
   let voiceContext = null;
+  let panelActive = false;
   let pendingClip = null;
   let voiceRequest = 0;
 
@@ -207,6 +223,13 @@
     } catch { notify('Full screen is unavailable in this browser view.'); }
   }
 
+  function leavePanel() {
+    if (!panelActive) return;
+    panelActive = false;
+    stopVoice();
+    voiceContext = objectiveId();
+  }
+
   function initDialog() {
     if (dialog) return;
     dialog = document.createElement('dialog');
@@ -215,11 +238,11 @@
     document.body.append(dialog);
     dialog.addEventListener('close', () => {
       if (dialog.open) return;
-      setVoiceContext(objectiveId(), false);
+      leavePanel();
       document.body.classList.remove('g-modal-open');
       if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true });
     });
-    dialog.addEventListener('cancel', () => setVoiceContext(objectiveId(), false));
+    dialog.addEventListener('cancel', leavePanel);
     dialog.addEventListener('click', e => {
       if (e.target !== dialog) return;
       const r = dialog.getBoundingClientRect();
@@ -227,8 +250,9 @@
     });
   }
 
-  function openPanel(type, label, title, content, voiceId = null) {
+  function openPanel(type, label, title, content, voiceId = null, automatic = true) {
     initDialog();
+    panelActive = true;
     if (!dialog.open) lastFocus = document.activeElement;
     dialog.className = 'g-dialog ' + type;
     dialog.innerHTML = '<div class="g-modal-shell"><header class="g-modal-head"><div><p class="g-label">' + esc(label) +
@@ -237,12 +261,12 @@
     if (!dialog.open) { dialog.showModal(); document.body.classList.add('g-modal-open'); }
     dialog.scrollTop = 0;
     dialog.querySelector('#g-modal-title').focus({ preventScroll: true });
-    setVoiceContext(voiceId);
+    setVoiceContext(voiceId, automatic);
   }
 
   function closeDialog() {
     if (dialog?.open) {
-      setVoiceContext(objectiveId(), false);
+      leavePanel();
       dialog.close();
     }
   }
@@ -298,13 +322,13 @@
       const i = chapter.items.findIndex(item => item.id === spot.id);
       if (i < 0) return '';
       const item = chapter.items[i], key = state.chapter + '.' + i;
-      const seen = state.seen.includes(key);
-      return '<button type="button" class="hotspot' + (seen ? ' is-seen' : '') + (spot.x > 73 ? ' is-right' : '') +
+      const seen = state.seen.includes(key), partial = key in state.witnessPages;
+      return '<button type="button" class="hotspot' + (seen ? ' is-seen' : partial ? ' is-partial' : '') + (spot.x > 73 ? ' is-right' : '') +
         '" data-ga="reader" data-key="' + key + '" data-x="' + spot.x + '" data-y="' + spot.y + '" style="left:' + spot.x + '%;top:' + spot.y + '%" aria-label="' +
-        esc(spot.label || item.title) + ', ' + esc(kindNames[item.kind]) + (seen ? ', examined' : '') + '"><span class="hotspot-dot">' + icon(item.kind) +
+        esc(spot.label || item.title) + ', ' + esc(kindNames[item.kind]) + (seen ? ', examined' : partial ? ', in progress' : '') + '"><span class="hotspot-dot">' + icon(item.kind) +
         '</span><span class="hotspot-label">' + esc(spot.label || item.title) + '</span></button>';
     }).join('');
-    const marks = chapter.items.map((_, i) => '<i' + (state.seen.includes(state.chapter + '.' + i) ? ' class="is-seen"' : '') + '></i>').join('');
+    const marks = chapter.items.map((_, i) => '<i' + (state.seen.includes(state.chapter + '.' + i) ? ' class="is-seen"' : (state.chapter + '.' + i) in state.witnessPages ? ' class="is-partial"' : '') + '></i>').join('');
     const t = (a, name, label, extra = '') => '<button type="button" class="dock-button ' + extra + '" data-ga="' + a + '">' + icon(name) + '<span>' + esc(label) + '</span></button>';
     const done = state.chapter < state.solved;
     const last = done && state.chapter === getCase().acts.length - 1;
@@ -316,9 +340,9 @@
       '<button type="button" class="pan-control pan-right" data-ga="pan-right" aria-label="Look right" hidden>' + icon('right') + '</button>' +
       '<header class="scene-top"><div class="scene-heading"><p class="scene-chapter">Tsujigiri <span aria-hidden="true">／</span> ' +
       chapterLabel(state.chapter) + '</p><h1 id="scene-title" class="scene-place" tabindex="-1">' + esc(scene.place) + '</h1><div class="scene-objective"><p class="scene-lead">' + esc(scene.lead) +
-      '</p>' + voiceButton(objectiveId(), 'the scene objective', true) + '</div></div><div class="scene-actions">' + voiceHud() + smallButton('fullscreen', 'Enter full screen', 'expand') + smallButton('menu', 'Pause menu', 'pause') +
+      '</p>' + voiceButton(objectiveId(), 'the scene objective', true) + '</div></div><div class="scene-actions"><button type="button" class="scene-guide" data-ga="guide">' + icon('book') + '<span>Field guide</span></button>' + voiceHud() + smallButton('fullscreen', 'Enter full screen', 'expand') + smallButton('menu', 'Pause menu', 'pause') +
       '</div></header><footer class="scene-bottom"><div class="scene-progress"><span class="progress-marks" aria-hidden="true">' + marks + '</span>' +
-      '<span class="progress-count" role="status">' + seenCount + ' / ' + chapter.items.length + ' examined</span><span class="scene-tip"' + (seenCount ? ' hidden' : '') +
+      '<span class="progress-count" role="status">' + seenCount + ' / ' + chapter.items.length + ' examined</span><span class="scene-tip"' + (seenCount || chapter.items.some((_, i) => (state.chapter + '.' + i) in state.witnessPages) ? ' hidden' : '') +
       '><span class="tip-point">Select a marker to examine it.</span><span class="tip-pan">Swipe to explore.</span></span></div><div class="scene-dock">' + t('casebook','book','Casebook') +
       t('notebook','notebook','Notebook') + t(last ? 'ending' : 'finding','pen',last ? 'Closing entry' : done ? 'Read finding' : 'Make finding','dock-primary') +
       '</div></footer><p class="g-notice" role="status" hidden></p></section>';
@@ -344,10 +368,13 @@
     state.started = true;
     state.view = 'desk';
     bookChapter = i;
+    const firstVisit = !state.briefed.includes(i);
+    if (firstVisit) state.briefed.push(i);
     save();
     renderScene();
-    setVoiceContext(objectiveId(), automatic);
     getGame().querySelector('#scene-title').focus({ preventScroll:true });
+    if (firstVisit) briefing(i, automatic);
+    else setVoiceContext(objectiveId(), automatic);
     if (!persistent) notify('Device storage is unavailable. This case lasts for this session.');
   }
 
@@ -378,32 +405,45 @@
     const rows = cur.items.map((item, i) => {
       const key = index + '.' + i;
       return '<div class="book-row"><button class="book-item" type="button" data-ga="reader" data-key="' + key + '">' + icon(item.kind) +
-        '<span><strong>' + esc(item.title) + '</strong><small>' + esc(kindNames[item.kind]) + ' · ' + (state.seen.includes(key) ? 'Examined' : 'Unexamined') +
+        '<span><strong>' + esc(item.title) + '</strong><small>' + esc(kindNames[item.kind]) + ' · ' + (state.seen.includes(key) ? 'Examined' : key in state.witnessPages ? 'In progress' : 'Unexamined') +
         '</small></span></button>' + pinButton(key) + '</div>';
     }).join('');
     openPanel('g-casebook-dialog','Kageura archive','Casebook','<nav class="book-tabs" aria-label="Chapter register">' + tabs + '</nav><section class="book-page"><h3>' +
       esc(cur.title) + '</h3><p>' + esc(cur.brief) + '</p><div class="book-list">' + rows + '</div>' +
       '<details class="book-record"><summary>Case record</summary><div class="g-prose">' + (index === 0 ? paragraphs(getCase().intro) : '') + paragraphs(cur.event) +
-      (index < state.solved ? paragraphs(cur.puzzle.success) + '<button type="button" class="g-secondary" data-ga="finding-record" data-index="' + index + '">Read the recorded finding</button>' : '') + '</div></details></section><footer class="book-footer">' + compareButton() +
+      (index < state.solved ? paragraphs(cur.puzzle.success) + '<button type="button" class="g-secondary" data-ga="finding-record" data-index="' + index + '">Read the recorded finding</button>' : '') + '</div></details></section><footer class="book-footer">' + assignmentLink(index) + compareButton() +
       (index !== state.chapter ? '<button class="g-primary" type="button" data-ga="chapter" data-index="' + index + '">Visit this scene</button>' :
         '<button class="g-secondary" type="button" data-ga="close">Return to scene</button>') + '</footer>');
   }
 
-  function markExamined(key) {
+  function recordExamination(key, page = 0) {
     if (state.seen.includes(key)) return;
-    state.seen.push(key);
+    const item = getItem(key);
+    const partial = item.kind === 'witness' && page < item.body.length - 1;
+    if (partial) state.witnessPages[key] = Math.max(state.witnessPages[key] || 0, page);
+    else {
+      state.seen.push(key);
+      delete state.witnessPages[key];
+    }
     save();
     const [a, i] = key.split('.').map(Number);
     if (a !== state.chapter) return;
-    const game = getGame(), point = game.querySelector('.hotspot[data-key="' + key + '"]');
-    if (point) {
-      point.classList.add('is-seen');
-      point.setAttribute('aria-label', point.getAttribute('aria-label') + ', examined');
+    const game = getGame();
+    const point = game.querySelector('.hotspot[data-key="' + key + '"]');
+    const mark = game.querySelectorAll('.progress-marks i')[i];
+    for (const el of [point, mark]) {
+      el?.classList.toggle('is-partial', partial);
+      el?.classList.toggle('is-seen', !partial);
     }
-    game.querySelectorAll('.progress-marks i')[i]?.classList.add('is-seen');
+    if (point) point.setAttribute('aria-label', point.querySelector('.hotspot-label').textContent + ', ' + kindNames[item.kind] + (partial ? ', in progress' : ', examined'));
     const n = act().items.filter((_, j) => state.seen.includes(a + '.' + j)).length;
     game.querySelector('.progress-count').textContent = n + ' / ' + act().items.length + ' examined';
     game.querySelector('.scene-tip').hidden = true;
+  }
+
+  function examNote(item) {
+    return '<dl class="exam-note"><div><dt>Why it matters</dt><dd>' + esc(item.exam.purpose) +
+      '</dd></div><div><dt>What to look for</dt><dd>' + esc(item.exam.action) + '</dd></div></dl>';
   }
 
   function table(item) {
@@ -415,13 +455,19 @@
 
   function readBody(item, tools = false) {
     const route = tools && item.id === 'town-plan' && window.mountRouteTool;
-    const paper = tools && item.id === 'wrapper' && window.mountPaperTool;
+    const paper = tools && (item.id === 'wrapper' || item.id === 'counterfoils') && window.mountPaperTool;
     let figure = '';
     if (item.asset) {
       figure = '<figure class="g-reader-figure' + (item.kind === 'map' ? ' g-map-figure' : '') + '">' + (route ? '<div class="g-route-mount"></div>' :
         '<img src="' + esc(item.asset) + '" alt="' + (item.kind === 'map' ? esc(item.caption) : '') + '">') + (item.caption ? '<figcaption>' + esc(item.caption) + '</figcaption>' : '') + '</figure>';
     }
-    return figure + '<div class="g-prose g-evidence-prose">' + paragraphs(item.body) + '</div>' + table(item) + (paper ? '<div class="g-paper-mount"></div>' : '');
+    const caption = !item.asset && item.caption ? '<p class="g-source-line">' + esc(item.caption) + '</p>' : '';
+    return examNote(item) + caption + figure + '<div class="g-prose g-evidence-prose">' + paragraphs(item.body) + '</div>' + table(item) + (paper ? '<div class="g-paper-mount"></div>' : '');
+  }
+
+  function mountExhibitTools() {
+    for (const slot of dialog.querySelectorAll('.g-route-mount')) window.mountRouteTool(slot, state);
+    for (const slot of dialog.querySelectorAll('.g-paper-mount')) window.mountPaperTool(slot);
   }
 
   function pager(action, page, length, key = '') {
@@ -430,37 +476,38 @@
       (page < length-1 ? nav(page+1,'Continue') : '<button type="button" class="g-primary" data-ga="close">Return to scene</button>') + '</div>';
   }
 
-  function showReader(key, page = 0) {
+  function showReader(key, page) {
     const item = getItem(key);
     if (!item) return;
-    markExamined(key);
+    const j = Math.max(0, Math.min(item.body.length - 1, page ?? state.witnessPages[key] ?? 0));
+    recordExamination(key, j);
     const index = Number(key.split('.')[0]);
     const tail = '<footer class="g-reader-tail">' + pinButton(key) +
       '<button type="button" class="g-secondary" data-ga="book-tab" data-index="' + index + '">' + icon('book') + ' Casebook</button></footer>';
     if (item.kind === 'witness') {
-      const j = Math.min(item.body.length - 1, Math.max(0, page));
       const voiceId = item.id + '-' + (j + 1);
       openPanel('g-witness-dialog', chapterLabel(index) + ' · Witness', item.title,
-        '<div class="witness-scene">' + (item.asset ? '<img class="witness-portrait" src="' + esc(item.asset) + '" alt="">' : '') +
+        examNote(item) + '<div class="witness-scene">' + (item.asset ? '<img class="witness-portrait" src="' + esc(item.asset) + '" alt="">' : '') +
         '<div class="witness-speech"><p class="g-label">' + esc(item.subtitle) + '</p><blockquote class="witness-line" aria-live="polite">' + esc(item.body[j]) + '</blockquote>' +
         voiceButton(voiceId,'this witness statement') + pager('speech',j,item.body.length,key) + '</div></div>' + tail, voiceId);
     } else {
       openPanel('g-reader-dialog g-kind-' + item.kind,chapterLabel(index) + ' · ' + (kindNames[item.kind] || 'Exhibit'),item.title,
         '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p><div class="g-reader-content">' + readBody(item,true) + '</div>' + tail);
-      const route = dialog.querySelector('.g-route-mount'), paper = dialog.querySelector('.g-paper-mount');
-      if (route) window.mountRouteTool(route,state);
-      if (paper) window.mountPaperTool(paper);
+      mountExhibitTools();
     }
   }
 
   function showComparison() {
+    // Both related paper records use the same physical tray when pinned together.
+    const trayKey = state.compare.find(key => getItem(key).id === 'wrapper') || state.compare.find(key => getItem(key).id === 'counterfoils');
     const exhibits = state.compare.map(key => {
       const item = getItem(key);
-      return '<article class="g-compare-exhibit"><p class="g-label">' + esc(kindNames[item.kind]) + '</p><h3>' + esc(item.title) + '</h3>' + readBody(item) + pinButton(key) + '</article>';
+      return '<article class="g-compare-exhibit"><p class="g-label">' + esc(kindNames[item.kind]) + '</p><h3>' + esc(item.title) + '</h3>' + readBody(item, key === trayKey || item.id === 'town-plan') + pinButton(key) + '</article>';
     }).join('');
     openPanel('g-wide-dialog', 'Casebook', 'Compare exhibits', (state.compare.length < 2 ? '<p class="g-comparison-help">Pin two records in your casebook to compare them here.</p>' : '') +
       '<div class="g-compare-columns">' + exhibits + '</div><footer class="book-footer"><button type="button" class="g-secondary" data-ga="book-tab" data-index="' +
       bookChapter + '">Return to casebook</button></footer>');
+    mountExhibitTools();
   }
 
   function togglePin(key) {
@@ -480,7 +527,7 @@
 
   function notebook() {
     load();
-    openPanel('g-notebook-dialog','Shared notes','Team notebook','<div class="g-notes"><label for="g-notes-input">Observations &amp; theories</label><textarea id="g-notes-input" placeholder="Where did the accounts disagree?">' +
+    openPanel('g-notebook-dialog','Shared notes','Team notebook','<div class="g-notes"><label for="g-notes-input">Observations &amp; theories</label><textarea id="g-notes-input" placeholder="What did you notice, and which exhibit supports it?">' +
       esc(state.notes) + '</textarea><p id="g-note-status" role="status">' + (persistent ? 'Saved as you write on this device.' : 'Storage unavailable. Notes last for this session.') + '</p></div>');
   }
 
@@ -500,10 +547,12 @@
     const shown = Math.max(0, Math.min(p.hints.length, Number(state.hints[i]) || 0));
     const hints = '<div class="g-hints">' + (shown ? '<ol>' + p.hints.slice(0,shown).map(h => '<li>' + esc(h) + '</li>').join('') + '</ol>' : '') +
       (shown < p.hints.length ? '<button class="g-text-button" type="button" data-ga="hint">' + (shown ? 'Reveal next hint' : 'Reveal a hint') + '</button>' : '') + '</div>';
-    openPanel('g-finding-dialog',chapterLabel(i) + ' · Joint finding',p.title,'<p class="g-finding-prompt">' + esc(p.prompt) + '</p><form id="g-answer-form" class="g-fields" novalidate>' +
+    openPanel('g-finding-dialog',chapterLabel(i) + ' · Joint finding',p.title,'<p class="g-finding-prompt">' + esc(act().assignment.question) + '</p>' +
+      assignmentBlock(act().assignment, false) + assignmentLink(i) + '<form id="g-answer-form" class="g-fields" novalidate>' +
       p.fields.map((f,j) => '<div><label for="g-answer-' + j + '">' + esc(f.label) + '</label><select id="g-answer-' + j + '" data-field="' + esc(f.id) + '" required><option value="">Choose a finding</option>' +
         f.options.map(o => '<option value="' + esc(o) + '">' + esc(o) + '</option>').join('') + '</select></div>').join('') +
-      '<p id="g-feedback" class="g-feedback" role="status"></p><button class="g-primary" type="submit">Enter finding</button></form>' + hints);
+      '<p id="g-feedback" class="g-feedback" role="status"></p><button type="button" class="g-secondary review-evidence" data-ga="book-tab" data-index="' + i + '" hidden>Review the evidence</button>' +
+      '<button class="g-primary" type="submit">Enter finding</button></form>' + hints);
     for (const field of dialog.querySelectorAll('select[data-field]')) field.value = state.drafts[i]?.[field.dataset.field] || '';
   }
 
@@ -523,7 +572,8 @@
     state.drafts[state.chapter] = values;
     if (!act().puzzle.fields.every(f => values[f.id] === f.answer)) {
       save();
-      message.textContent = 'The evidence does not support that account. Check your sources and try again.';
+      message.textContent = 'The evidence does not support that account. Your choices are saved while you check the exhibits.';
+      form.querySelector('.review-evidence').hidden = false;
       return;
     }
     state.solved++;
@@ -551,8 +601,10 @@
     const lines = getCase().intro;
     const j = Math.max(0, Math.min(page, lines.length - 1));
     const voiceId = 'prologue-' + (j + 1);
+    const startSilentLine = voiceContext === voiceId && window.gameVoice?.enabled() && !pendingClip && !window.gameVoice.current();
     openPanel('g-ending-dialog g-prologue-dialog','The Kageura Crossing','Opening story','<div class="g-ending"><div class="g-prose">' +
       paragraphs(lines[j]) + '</div>' + voiceButton(voiceId,'this opening passage') + pager('prologue',j,lines.length) + '</div>', voiceId);
+    if (startSilentLine) playVoice(false);
   }
 
   function history() {
@@ -577,11 +629,60 @@
     syncSound(); syncFullscreen(); syncVoice();
   }
 
-  function guide() {
-    openPanel('g-guide-dialog','Field guide','How to play','<div class="g-prose"><p>Select a marker to speak with a witness or inspect an object. Swipe to look around. The speech bubble turns on narration.</p>' +
-      '<p>Open the casebook to revisit evidence. Pin two records to compare them. Keep shared notes in the notebook.</p><p>Choose <strong>Make finding</strong> when the group agrees. Each chapter offers optional hints.</p></div>' +
-      '<details class="book-record"><summary>Roles for two to four players</summary><dl>' + getCase().roles.map(r => '<div><dt>' + esc(r.name) + '</dt><dd>' + esc(r.task) + '</dd></div>').join('') +
-      '</dl><p>With two players, take two roles each and switch next chapter.</p></details><footer class="book-footer"><button class="g-primary" type="button" data-ga="close">Return to scene</button></footer>');
+  function assignmentLink(index) {
+    return '<button type="button" class="g-secondary assignment-link" data-ga="assignment" data-index="' + index + '">' + icon('book') + ' Chapter assignment</button>';
+  }
+
+  function assignmentBlock(task, withQuestion = true) {
+    return '<section class="assignment-block" aria-label="Chapter assignment">' +
+      (withQuestion ? '<p class="assignment-question">' + esc(task.question) + '</p>' : '') +
+      '<p class="assignment-method"><strong>How to check</strong> <span>' + esc(task.approach) + '</span></p>' +
+      '<p class="assignment-first"><strong>First lead</strong> <span>' + esc(task.firstLook) + '</span></p></section>';
+  }
+
+  function briefing(index = state.chapter, automatic = true) {
+    if (!Number.isInteger(index) || index < 0 || index > state.solved || index >= getCase().acts.length) return;
+    if (!state.briefed.includes(index)) {
+      state.briefed.push(index);
+      save();
+    }
+    const cur = getCase().acts[index];
+    const opening = index === 0;
+    const file = getCase();
+    const voice = opening ? 'prologue-1' : 'objective-' + (index + 1);
+    const body = '<article class="brief-note"><p class="brief-setting">' + esc(opening ? file.setting : window.SCENES[index].place) +
+      '</p><div class="brief-lore g-prose">' + paragraphs(opening ? file.intro[0] : window.SCENES[index].lead) +
+      (opening ? voiceButton(voice,'the opening passage') + '<p>Six weeks ago, another traveler survived an attack on this road. At dawn, a rider will take your account to the district office.</p>' : '') + '</div>' +
+      assignmentBlock(cur.assignment) + '</article><footer class="brief-actions">' +
+      (index === state.chapter ? '<button type="button" class="g-primary" data-ga="close">' + (opening ? 'Start investigating' : 'Explore the scene') + '</button>' :
+        '<button type="button" class="g-primary" data-ga="chapter" data-index="' + index + '">Visit this scene</button>') +
+      '<button type="button" class="g-secondary" data-ga="guide" data-page="play">How to play</button>' +
+      (opening ? '<button type="button" class="g-secondary" data-ga="prologue">Opening story</button>' :
+        voiceButton(voice, 'the scene objective')) + '</footer>';
+    openPanel('g-briefing-dialog',chapterLabel(index) + ' · The headman’s request',opening ? 'A death at the crossing' : cur.title,body,voice,automatic);
+  }
+
+  function guide(page = 'case') {
+    if (!['case','play','lead'].includes(page)) page = 'case';
+    const file = getCase();
+    const tabs = [['case','The case'],['play','How to play'],['lead','Current lead']].map(([id,label]) =>
+      '<button type="button" data-ga="guide" data-page="' + id + '"' + (page === id ? ' aria-current="page"' : '') + '>' + label + '</button>').join('');
+    let body;
+    if (page === 'case') {
+      body = '<h3>' + esc(file.subtitle) + '</h3><p class="brief-setting">' + esc(file.setting) + '</p><div class="g-prose">' + paragraphs(file.intro) +
+        '</div><button type="button" class="g-secondary" data-ga="prologue">' + icon('narrate') + ' Opening story</button>';
+    } else if (page === 'lead') {
+      body = '<h3>' + esc(act().title) + '</h3>' + assignmentBlock(act().assignment);
+    } else {
+      body = '<h3>Work the scene together</h3><ol class="guide-steps">' +
+        '<li><strong>Examine a person or object.</strong> Select a marker in the room. Continue through a witness’s last line. Swipe or use the side controls to look around.</li>' +
+        '<li><strong>Compare accounts.</strong> Open the casebook and pin two records. Use Compare to trace a route or set two pieces of evidence side by side. Record your theory in the notebook.</li>' +
+        '<li><strong>Agree on a finding.</strong> Select Make finding and enter what the exhibits support. You can revise an answer or reveal a hint. A supported finding opens the next chapter.</li></ol>' +
+        '<details class="book-record"><summary>Roles for two to four players</summary><dl>' + file.roles.map(r => '<div><dt>' + esc(r.name) + '</dt><dd>' + esc(r.task) + '</dd></div>').join('') +
+        '</dl><p>With two players, take two roles each. Trade at the next chapter.</p></details>';
+    }
+    openPanel('g-guide-dialog','Kageura archive','Field guide','<nav class="guide-tabs" aria-label="Field guide sections">' + tabs + '</nav><section class="guide-page">' + body +
+      '</section><footer class="guide-actions">' + assignmentLink(state.chapter) + '<button type="button" class="g-primary" data-ga="close">Back to scene</button></footer>');
   }
 
   function clearSaved() {
@@ -623,7 +724,8 @@
         break;
       }
       case 'menu': menu(); break;
-      case 'guide': guide(); break;
+      case 'guide': guide(page); break;
+      case 'assignment': briefing(Number(index)); break;
       case 'history': history(); break;
       case 'reader': showReader(key); break;
       case 'speech': showReader(key,Number(page)); break;

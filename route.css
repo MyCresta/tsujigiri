@@ -109,3 +109,11 @@
   :is(#game, .g-dialog) .rt-tool .rt-node[aria-current] { color: #fff6da; background: var(--rt-accent); border-color: var(--rt-accent); }
   .rt-tool .rt-ledger { flex-wrap: wrap; }
 }
+.rt-tool .rt-use {
+  margin: 0;
+  padding: .55rem .85rem;
+  border-top: 1px solid #b8ae96;
+  color: #4b493d;
+  background: #e7dec7;
+  font: italic 500 1.05rem/1.3 var(--serif, Georgia, serif);
+}

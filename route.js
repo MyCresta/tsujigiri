@@ -22,7 +22,7 @@
     root.className = 'rt-tool';
     root.setAttribute('aria-label', 'Trace a route');
     root.innerHTML = `
-      <p class="rt-instruction">Choose a starting place, then follow a connecting road.</p>
+      <p class="rt-instruction">Select a house to start. Select a house joined to it by one road to add a stretch. Use Undo to try a different turn.</p>
       <div class="rt-map" role="group" aria-label="Kageura road map">
         <img class="rt-print" src="assets/evidence/map.webp" width="1400" height="900" alt="Road plan with three river crossings. The table below lists the houses on each bank.">
         <div class="rt-banks" aria-hidden="true"><span>West bank</span><span>East bank</span></div>
@@ -33,7 +33,8 @@
           <span class="rt-path"></span>
         </div>
         <div class="rt-actions"><button type="button" class="rt-undo">Undo</button><button type="button" class="rt-clear">Clear</button></div>
-      </div>`;
+      </div>
+      <p class="rt-use">Compare your trial route with the folded slip. When they agree, take the destination back to the drawer list.</p>`;
     container.append(root);
     const board = root.querySelector('.rt-map');
     const undo = root.querySelector('.rt-undo');
@@ -66,7 +67,11 @@
       button.append(label);
       board.append(button);
       button.addEventListener('click', () => {
-        if (button.getAttribute('aria-disabled') === 'true') return;
+        if (button.getAttribute('aria-disabled') === 'true') {
+          const last = houses[scratchRoute.at(-1)][0];
+          path.textContent = 'From ' + last + ', choose a house one road away, or undo your last move.';
+          return;
+        }
         scratchRoute.push(index);
         update();
       });

@@ -4,9 +4,9 @@ window.CASEFILE = {
   subtitle: "The Kageura Crossing",
   setting: "Kageura, Japan · Late autumn, 1752",
   intro: [
-    "Sōhei wrote love letters for a copper and complaints for free. Tonight the town copyist lies dead at the red bridge, a scrap of paper in his hand.",
-    "Six weeks ago a stranger survived a sword attack on this road. Now Kageura whispers tsujigiri, a swordsman who strikes passersby.",
-    "The headman needs your findings before the gates open at dawn. Sōhei left papers somewhere in town."
+    "You are townspeople the headman trusts to hear witnesses and check the records. Sōhei wrote Kageura’s love letters for a copper and its complaints for free. Tonight he lies dead at the red bridge, paper clenched in his hand.",
+    "Six weeks ago a stranger survived a sword attack on this road. Outside the inn you hear the word tsujigiri, a swordsman who strikes passersby. The headman wants to know whether the same man has struck again.",
+    "At dawn the gates open and a rider leaves for the district office. The headman needs to sign your account before the rider leaves. Start with Tomo at the Reed Inn. Sōhei gave her something for safekeeping."
   ],
   roles: [
     { name: "Reader", task: "Read the witnesses’ words aloud." },
@@ -20,20 +20,33 @@ window.CASEFILE = {
       title: "The copyist’s last errand",
       kicker: "Reed Inn",
       brief: "Tomo lays a split tally by her tea bowl. Its mate is with Sōhei’s papers.",
-      event: "The headman shuts the road gates. Rain ticks against the inn shutters.",
+      event: "The road gates are shut. At the Reed Inn, strangers wait out the rain while Tomo clears a space on her tea table.",
+      assignment: {
+        question: "Where did Sōhei leave his packet, and which drawer holds it?",
+        approach: "Follow his walking directions on the road map. Use the wooden tally to work out which drawer to ask the keeper to open.",
+        firstLook: "Ask Tomo where the folded slip and the tally came from."
+      },
       items: [
         {
           id: "storm-witness", kind: "witness", title: "Tomo’s statement", subtitle: "Tea seller · Reed Inn",
           asset: "assets/evidence/storm-witness.webp", caption: "Tomo at the Reed Inn.",
+          exam: {
+            purpose: "Sōhei gave his directions from a familiar doorstep. Tomo can place that door on the map.",
+            action: "Listen for the place Tomo means by “my door.” Find that place on the road map."
+          },
           body: [
-            "“Sōhei left from my door to put his papers in one of the deposit chests across the river.”",
-            "“He left a walking riddle for his niece Hana under my saucer. Later he came back with this tally.”",
-            "“I went to take him his coat that night. He was dead at the east bridgepost.”"
+            "“Sōhei left from my door, here at the Reed Inn. He meant to leave his papers in one of the deposit chests across the river.”",
+            "“His niece Hana loves a walking riddle. He tucked one under my saucer for her, then he came back later and gave me this tally.”",
+            "“He’d forgotten his coat again. When I took it to the east bridgepost that night, I found him dead.”"
           ]
         },
         {
           id: "town-plan", kind: "map", title: "The two river roads", subtitle: "Kageura · Headman’s road plan",
           asset: "assets/evidence/map.webp", caption: "North is up. Each crossing links the places in its row.",
+          exam: {
+            purpose: "The map shows which roads Sōhei could take and which buildings stand at their ends.",
+            action: "Choose his starting place. Trace one road for each stretch in the slip and keep track of which hand faces the river."
+          },
           body: [
             "Each bank has a north–south lane linking neighboring places. A lane between neighbors or a crossing counts as one stretch.",
             "All three crossings were open. These are the only roads. Each east-bank place has a deposit chest."
@@ -47,6 +60,10 @@ window.CASEFILE = {
         {
           id: "journey-slip", kind: "document", title: "The slip under the saucer", subtitle: "A walking riddle · Sōhei’s hand",
           caption: "A tea bill folded under Tomo’s saucer.",
+          exam: {
+            purpose: "Sōhei wrote a route his niece could follow without knowing his destination.",
+            action: "Read the slip aloud, one stretch at a time, while another player follows it on the road map."
+          },
           body: [
             "“Hana, three stretches from Aunt Tomo’s door to the chest. The middle one crossed the river. On the first and last I kept the water on the same side of me.”",
             "“Match my tally’s cuts to the drawer list. I owe you a persimmon.”"
@@ -55,14 +72,22 @@ window.CASEFILE = {
         {
           id: "tally-half", kind: "object", title: "Half a deposit tally", subtitle: "From Tomo’s sleeve",
           asset: "assets/evidence/tally-half.webp", caption: "Three clean cuts along the split tally’s edge.",
+          exam: {
+            purpose: "The keeper marked the wood before splitting it. The cuts tell you how to claim the packet once you find the right chest.",
+            action: "Inspect the long edge. Count the deliberate cuts and check what caused the damage at the corner."
+          },
           body: [
             "The keeper cut the long edge before splitting the tally. Three cuts are smooth. The ragged corner chipped when Tomo dropped it.",
-            "Its other half is tied to the packet."
+            "Its other half is tied to the packet. A keeper can hand back a sealed letter without reading a word of it."
           ]
         },
         {
           id: "drawer-list", kind: "document", title: "Keepers’ drawer list", subtitle: "Copied inside each chest lid",
           caption: "Drawer emblems by chest and tally.",
+          exam: {
+            purpose: "The same tally can mean different drawer emblems at different chests.",
+            action: "Find the row for the place where the walk ends. Read across to the column that matches the tally."
+          },
           body: [
             "Choose the chest’s row. Each long-edge cut counts once."
           ],
@@ -81,9 +106,9 @@ window.CASEFILE = {
           { id: "drawer", label: "Which drawer?", options: ["Carp", "Heron", "Reed"], answer: "Reed" }
         ],
         hints: [
-          "Start at the Reed Inn. Your first stretch follows the bank.",
-          "Walk north, then cross. Which turn keeps the water on the same side?",
-          "South takes you to the Rice Store. Read the three-cut column."
+          "Set a finger on the door Tomo names. A stretch ends at the next place on the map.",
+          "The middle stretch is the crossing. Follow the bank first and remember which hand faces the river.",
+          "After the crossing, try each turn. Which keeps the river at that same hand? Use your destination’s drawer row and count only the keeper’s cuts."
         ],
         success: "The tally fits. In the Rice Store’s reed drawer are Sōhei’s shelter accounts. “Count what reached the people,” he wrote."
       }
@@ -92,14 +117,23 @@ window.CASEFILE = {
       id: "the-stores",
       title: "What the river took",
       kicker: "Paper Loft",
-      brief: "At the Paper Loft, Miyo lays out the accounts for four flood shelters.",
+      brief: "After the last flood, families slept in four communal shelters. Miyo saw them bed down. Sōhei went from door to door asking whether everyone had a mat.",
       event: "“Give me some charcoal,” Miyo says. “I helped unload that cart.”",
+      assignment: {
+        question: "Which shelter was overcharged, how many mats did it receive, and how many extra did the town pay for?",
+        approach: "Work out what was on the cart for each shelter. Correct those totals with Miyo’s account, then compare them with the paid bill.",
+        firstLook: "Look at the Cord rack. What exactly did the cart clerk count?"
+      },
       items: [
         {
           id: "cord-board", kind: "object", title: "The carrier’s cord board", subtitle: "Samples kept by the cart shed",
           asset: "assets/evidence/cord-board.webp", caption: "Three specimens from the cart shed.",
+          exam: {
+            purpose: "The cart clerk recorded cords. Each kind held a different number of sleeping mats.",
+            action: "Match the three cord samples to their load sizes. Keep those numbers beside the columns in the Cart book."
+          },
           body: [
-            "Each cord tied one load. The crew used these three sizes."
+            "The carriers hung a sample of each binding on a peg. A clerk could count the loads as the cart went by, even in rain. Each cord tied one load."
           ],
           table: { head: ["Cord", "What it held"], rows: [
             ["Rough straw", "One full roll of four sleeping mats"],
@@ -110,8 +144,12 @@ window.CASEFILE = {
         {
           id: "carrier-book", kind: "document", title: "The cart gate count", subtitle: "Recorded before inspection",
           caption: "The gate clerk’s count before unloading.",
+          exam: {
+            purpose: "This count tells you how many loads reached the gate before anyone checked the delivery.",
+            action: "For each shelter, multiply the number of each kind of cord by the mats it held. Add the three results."
+          },
           body: [
-            "The clerk counted cords before Miyo checked the mats. Each shelter uses its door emblem."
+            "The clerk counted cords at the gate before Miyo checked the mats. The shelters took their names from the emblems painted on their doors."
           ],
           table: { head: ["Shelter", "Straw", "Indigo", "Linen"], rows: [
             ["Plum", "2", "2", "1"], ["Pine", "3", "0", "0"],
@@ -121,18 +159,26 @@ window.CASEFILE = {
         {
           id: "loft-witness", kind: "witness", title: "Miyo’s corrections", subtitle: "Paper merchant · Delivery witness",
           asset: "assets/evidence/loft-witness.webp", caption: "Miyo kept spare stock in her loft.",
+          exam: {
+            purpose: "Miyo handled the mats after the clerk counted the cart. She can explain any difference between the cart and the shelter floor.",
+            action: "Listen for anything added or sent back. Apply each change to the right shelter, using the Cord rack for roll sizes."
+          },
           body: [
-            "“At the Wave shelter I added one loose mat. It had dried on my rafters and never went on the cart.”",
-            "“At the Kite shelter I sent back a soaked half roll. My grandsons shared a mat there.”",
-            "“Plum and Pine got their cart loads exactly. None of the four shelters received another delivery.”"
+            "“At Wave shelter I added one loose mat from my own stock. I’d hung it on a rafter to dry, so it never went on the cart.”",
+            "“At Kite shelter the middle of the half roll was still wet. I sent the whole half roll back, and my grandsons shared a mat.”",
+            "“Plum and Pine received exactly what was on the cart. I kept the shelters’ keys until the families went home, and none of the four received another delivery.”"
           ]
         },
         {
           id: "claim-roll", kind: "document", title: "The settled account", subtitle: "Shelter expenses · Paid in full",
           caption: "Quantities the town paid for.",
+          exam: {
+            purpose: "The town paid this bill in full. Compare the amounts charged with what families actually received.",
+            action: "Work across the four shelters. For each, subtract the corrected delivery from the number of mats paid for."
+          },
           body: [
-            "Figures are individual mats. The total includes officers’ private purchases. A private purchase earned repayment only if the shelter received it.",
-            "Four officers handled the money."
+            "Figures are individual mats. The town paid the same agreed rate for cart deliveries and mats supplied from local stock. Officers could also claim repayment for private purchases delivered to a shelter.",
+            "Four relief officers handled the money. In the margin Sōhei has written, “Ask the people who unrolled them.”"
           ],
           table: { head: ["Plum", "Pine", "Kite", "Wave"], rows: [["13 mats", "12 mats", "14 mats", "15 mats"]] }
         }
@@ -147,8 +193,8 @@ window.CASEFILE = {
         ],
         hints: [
           "Convert each cord into mats before applying Miyo’s corrections.",
-          "Add one at Wave. Take two away at Kite.",
-          "Kite received eight. Subtract eight from the fourteen paid for."
+          "The spare mat never passed the gate. The half roll that went back still appears in the cart count.",
+          "For each shelter, put mats actually laid out beside mats paid for. Subtract the first figure from the second."
         ],
         success: "Six mats never reached Kite. An officer claimed that he bought those six himself. The clerk goes for the payment slips."
       }
@@ -157,24 +203,37 @@ window.CASEFILE = {
       id: "the-watch",
       title: "A space between sounds",
       kicker: "Relay Office",
-      brief: "Four officers were invited to the bridge. Find out who could have gone.",
+      brief: "The relay workers spent the storm shoring up buildings along the river. The officers changed posts at the sound of the work calls. Some have people who can vouch for where they stood.",
       event: "Isuke arrives in mismatched sandals, carrying a sewing basket Tomo recovered from beneath the bridge bench.",
+      assignment: {
+        question: "When was Sōhei killed, and which invited officers could have reached him?",
+        approach: "Put the last sighting and the call for help in order. Use the duty records to check where each officer was during that interval.",
+        firstLook: "Speak to Isuke. Which part of his journey can he place most precisely?"
+      },
       items: [
         {
           id: "gate-witness", kind: "witness", title: "Isuke and the sewing basket", subtitle: "Relay porter · Last sighting",
           asset: "assets/evidence/gate-witness.webp", caption: "Isuke, the relay porter.",
+          exam: {
+            purpose: "Isuke saw Sōhei alive and later heard Tomo call for help. His journey puts those events in order.",
+            action: "Listen for the sounds he heard at the bridge and at the Rice Store. Place each beside his observations."
+          },
           body: [
-            "“My sister Ume mends lanterns. I took her sewing basket to Sōhei at the east bridgepost.”",
-            "“The hoist clapper sounded. Sōhei raised the basket and asked, ‘Did your needles hear that too?’”",
-            "“I left him there. Tomo was calling for help when I reached the Rice Store braces.”",
-            "“The men were still leaning on them. The store drum sounded after I told them.”"
+            "“My sister Ume repairs lanterns, and she was due to meet Sōhei. I took her sewing basket to him at the east bridgepost.”",
+            "“When the hoist clapper sounded, he raised the basket to his ear. ‘Did your needles hear that too?’ he asked me.”",
+            "“I left Sōhei at the bridge and went down the lane. By the time I reached the Rice Store, Tomo was calling for help.”",
+            "“The men had their shoulders against the new timber braces. I told them what I’d heard, and only after that did the store drum sound.”"
           ]
         },
         {
           id: "signal-log", kind: "document", title: "The signal keeper’s slate", subtitle: "River work · Order of calls",
           caption: "The calls in the order they sounded.",
+          exam: {
+            purpose: "The river crews kept time by their work calls. This slate gives their order that night.",
+            action: "Find the calls Isuke remembers. Which part of the watch falls between the last sighting and news of the death?"
+          },
           body: [
-            "Each flood-work signal sounded once and marked a change of duty."
+            "The workers had to hear their change of duty over the river and the rain. Each call on the slate sounded just once that night."
           ],
           table: { head: ["In order", "Call", "What changed"], rows: [
             ["First", "Ferry gong", "Night crews took their first stations."],
@@ -186,6 +245,10 @@ window.CASEFILE = {
         {
           id: "crew-roll", kind: "document", title: "The brace crews", subtitle: "Duty roll · Officers present",
           caption: "Officers stationed away from the bridge.",
+          exam: {
+            purpose: "Workers at two stations can account for the officers who stayed with them. Their evidence applies only to the interval they signed for.",
+            action: "Read the row for the interval you established. Cross its two posted officers off the list of invitees."
+          },
           body: [
             "Two workers at each station swear its listed officer stayed throughout the interval. Neither station touches the east bridgepost.",
             "The four relief officers were Daigo, Iori, Kichibei and Renji."
@@ -199,23 +262,27 @@ window.CASEFILE = {
         {
           id: "invitation", kind: "document", title: "Four invitations", subtitle: "Counterbook from Sōhei’s desk",
           caption: "Sōhei copied each invitation before sending it.",
+          exam: {
+            purpose: "Sōhei sent the same invitation to four officers. The copies establish who had a reason to come to the bridge.",
+            action: "Check whom Isuke reached and when. Compare the invitation list with the officers accounted for on the duty roll."
+          },
           body: [
             "“Meet me at the east bridgepost. A woman deserves a hearing. The Kite shelter account needs correcting.”",
-            "Isuke delivered this to all four officers before dark. Sōhei’s note to Ume reads, “There will be a lamp this time.”"
+            "Isuke delivered copies to Daigo, Iori, Kichibei and Renji before dark. Sōhei’s note to Ume reads, “There will be a lamp this time.”"
           ]
         }
       ],
       puzzle: {
         title: "Reconstruct the watch",
-        prompt: "Between which calls was Sōhei killed? Which two officers were free?",
+        prompt: "Between which calls was Sōhei killed? Which two officers still lack a witnessed alibi?",
         fields: [
           { id: "interval", label: "Interval of the killing", options: ["Ferry gong to hoist clapper", "Hoist clapper to store drum", "Store drum to gate rattle"], answer: "Hoist clapper to store drum" },
           { id: "possible", label: "Officers still under inquiry", options: ["Daigo and Iori", "Kichibei and Renji", "Daigo and Kichibei", "Iori and Renji", "Daigo and Renji", "Iori and Kichibei"], answer: "Iori and Renji" }
         ],
         hints: [
           "Find the last time Isuke heard Sōhei speak.",
-          "The clapper sounded while Sōhei lived. The drum came after Tomo called.",
-          "Cross Kichibei and Daigo off the four invitations for that interval."
+          "One sound interrupted a conversation. Another came after news of the death. Find both sounds on the slate.",
+          "Read only the row between those calls. Set the two posted officers aside and check which invitees remain."
         ],
         success: "Daigo and Kichibei are excused. Iori and Renji wait apart. Isuke lights a candle for his sister outside."
       }
@@ -224,25 +291,38 @@ window.CASEFILE = {
       id: "the-hearing",
       title: "The woman at the rail",
       kicker: "Headman’s Room",
-      brief: "Ume sets her lantern before the headman. “First, put down my name.”",
+      brief: "The first account of the roadside attack calls its survivor “a traveler.” Ume sets her repaired lantern before the headman. “First, put down my name.”",
       event: "The clerk brings four counterfoils from the pay desk. Outside, the first birds call.",
+      assignment: {
+        question: "Who struck Sōhei, which payment slip did he carry, and what had he claimed?",
+        approach: "Compare the eyewitness and the duty records to identify the man. Reunite the torn paper, then check its payment against the shelter accounts.",
+        firstLook: "Hear Ume describe what she saw at the rail."
+      },
       items: [
         {
           id: "hearing-witness", kind: "witness", title: "Ume gives her name", subtitle: "Lantern mender · Eyewitness",
           asset: "assets/evidence/hearing-witness.webp", caption: "Ume with her repaired lantern.",
+          exam: {
+            purpose: "Ume can connect a face and a piece of paper with the attack.",
+            action: "Listen for how she recognized the man and how the paper changed hands. Check those details separately."
+          },
           body: [
-            "“Six weeks ago a stranger struck me on the road. My fallen lamp lit an old white scar through his left eyebrow.”",
-            "“I saw him again among the four relief officers at the pay desk. I knew his face, never his name.”",
-            "“Tonight Sōhei said, ‘Give the shelter its money back. Then we will hear Ume.’ My lamp showed the same face and brow.”",
-            "“I saw him strike Sōhei. As he fell, Sōhei caught a slip and tore it from the man’s purse cord.”",
-            "“I hid behind the river stair. Tomo came moments later.”"
+            "“Six weeks ago a stranger struck me on the road. My lamp fell sideways and lit his face from below. An old white scar ran through his left eyebrow.”",
+            "“A week ago I saw him among the four relief officers at the pay desk. I knew his face, although I had never learned his name.”",
+            "“Tonight I heard Sōhei say, ‘Give the shelter its money back. Then we will hear Ume.’ When the man turned toward my lamp, I saw the same face and brow.”",
+            "“I saw him strike Sōhei. As Sōhei fell, his hand caught a paper slip on the man’s purse cord and tore it free.”",
+            "“I hid on the river stair until Tomo came. I could hear her calling for help, and all that time I had my hand over my own mouth.”"
           ]
         },
         {
           id: "pass-register", kind: "document", title: "The pass keeper’s descriptions", subtitle: "Renewal book · Four relief officers",
           caption: "Descriptions taken before either attack.",
+          exam: {
+            purpose: "The keeper described each officer before either attack. Those descriptions can put names to Ume’s observation.",
+            action: "Find every description that fits the witness. Test each name against the duty interval you established at the Relay Office."
+          },
           body: [
-            "Left and right refer to the officer’s own body. Compare Ume’s words and the brace crews’ roll."
+            "The keeper entered these marks in daylight when the officers renewed their road passes. Left and right refer to the officer’s own body."
           ],
           table: { head: ["Officer", "Marks recorded"], rows: [
             ["Daigo", "Old white scar through left eyebrow. Small mark on chin."],
@@ -254,15 +334,23 @@ window.CASEFILE = {
         {
           id: "wrapper", kind: "object", title: "The copyist’s last handful", subtitle: "Found at the east bridgepost",
           asset: "assets/evidence/wrapper.webp", caption: "Tomo’s headcloth protects the torn slip.",
+          exam: {
+            purpose: "Tomo saved the torn paper from Sōhei’s hand. Part of its edge and a coloured fibre survived the rain.",
+            action: "Read down from the knot hole. Note the shape of each turn and where the blue fibre crosses."
+          },
           body: [
             "Knot hole uppermost, the torn edge reads OUT, IN, IN from top to bottom. A blue fibre crosses at the middle turn.",
             "Both holes belong at the top. Outward turns fit inward turns. The fibre must meet across the join.",
-            "The slip gives only an amount, the price of six sleeping mats."
+            "A patch of dry ink gives the amount, the price of six sleeping mats. The clerk needs the other half to learn what the officer said he bought."
           ]
         },
         {
           id: "counterfoils", kind: "document", title: "Four counterfoils", subtitle: "Pay desk · The clerk’s register",
           caption: "Counterfoil edges read down from their knot holes.",
+          exam: {
+            purpose: "A counterfoil is the half the pay desk kept. A physical match identifies the voucher the attacker carried.",
+            action: "Try joining each counterfoil to the recovered slip. Check the whole edge and the blue fibre."
+          },
           body: [
             "Officers kept pay slips on their purse cords until the week’s accounts closed. All four vouchers are for the same sum.",
             "Match the edge and fibre, then look up the voucher mark."
@@ -277,8 +365,12 @@ window.CASEFILE = {
         {
           id: "payments", kind: "document", title: "The voucher purposes", subtitle: "Pay desk · Entered upon collection",
           caption: "Declarations entered when the money was collected.",
+          exam: {
+            purpose: "The matching voucher mark tells you what the collector said the town was paying for.",
+            action: "Look up the mark you matched. Compare its claim with the delivery finding from the Paper Loft."
+          },
           body: [
-            "Each collector swore the work was complete. Check the declaration against the shelter count."
+            "When a collector took the money he declared that the goods had been delivered. The clerk copied his words into the register."
           ],
           table: { head: ["Mark", "Purpose named by the collector"], rows: [
             ["Fan", "New rope delivered for the ferry."],
@@ -298,8 +390,8 @@ window.CASEFILE = {
         ],
         hints: [
           "Compare the left-brow scar with the two officers left on the watch list.",
-          "Find an IN, OUT, OUT counterfoil with its blue fibre at the middle.",
-          "Daigo was at the Rice Store. Iori was free. Read the Crane payment against the Kite delivery."
+          "Keep the holes uppermost. A hollow on one edge needs a bulge on the other. Check the fibre after fitting the turns.",
+          "Two officers share the feature Ume saw. Check their alibis. Two counterfoils fit the edge. Compare their fibres before opening the payments register."
         ],
         success: "The Crane halves fit. The clerk records Ume’s account of the slip torn from Iori’s purse."
       }
