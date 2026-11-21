@@ -122,8 +122,8 @@ window.CASEFILE = {
           id: "loft-witness", kind: "witness", title: "Miyo’s corrections", subtitle: "Paper merchant · Delivery witness",
           asset: "assets/evidence/loft-witness.webp", caption: "Miyo kept spare stock in her loft.",
           body: [
-            "“Wave got one extra loose mat from my rafters. It never went on the cart.”",
-            "“Kite’s half roll was soaked, so I sent it back. My grandsons shared a mat there.”",
+            "“At the Wave shelter I added one loose mat. It had dried on my rafters and never went on the cart.”",
+            "“At the Kite shelter I sent back a soaked half roll. My grandsons shared a mat there.”",
             "“Plum and Pine got their cart loads exactly. None of the four shelters received another delivery.”"
           ]
         },

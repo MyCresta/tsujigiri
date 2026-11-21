@@ -298,3 +298,14 @@
 @media (prefers-reduced-motion:reduce) {
   *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; scroll-behavior:auto!important; }
 }
+.hotspot.is-right .hotspot-label { left:calc(50% - 4px);transform:translateX(-100%); }
+.scene-objective { display:flex;align-items:center;gap:7px; }
+.scene-objective .scene-lead { font-size:clamp(16px,1.36vw,21px); }
+.voice-objective {
+  flex:none; display:grid;place-items:center;pointer-events:auto;
+  width:30px;height:30px;padding:3px;border:1px solid #dfc39975;border-radius:50%;
+  color:#f3dfbb;background:#25291d99;
+}
+.voice-objective .g-icon { width:14px;height:14px; }
+.voice-objective:is(:hover,.is-speaking) { color:#fff0cc;border-color:#ddae76;background:#754a32; }
+@media(max-width:580px) { .scene-objective { align-items:flex-start; } .voice-objective { width:28px;height:28px; } }

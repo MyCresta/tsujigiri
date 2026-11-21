@@ -12,6 +12,10 @@
     compare: '<rect x="2" y="5" width="8" height="14" rx=".5"/><rect x="14" y="5" width="8" height="14" rx=".5"/>',
     expand: '<path d="M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6"/>',
     volume: '<path d="M3 9h4l5-5v16l-5-5H3zM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor" stroke="none"/>',
+    narrate: '<path d="M3 9h4l5-4v14l-5-4H3zM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+    speechOn: '<path d="M4 3.5h16a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5h-9L5 21v-3.5H4A1.5 1.5 0 0 1 2.5 16V5A1.5 1.5 0 0 1 4 3.5z"/><path d="M7 9v3m3.3-5v7m3.4-6v4.5M17 9.5v2"/>',
+    speechOff: '<path d="M9 3.5h11A1.5 1.5 0 0 1 21.5 5v10M3 5v11a1.5 1.5 0 0 0 1.5 1.5H5V21l6-3.5h4.5M7 10v2m3.3.5V14M17 9.5v2M2.5 2.5l19 19" />',
     mute: '<path d="M3 9h4l5-5v16l-5-5H3zM16 9l5 6m0-6-5 6"/>',
     lock: '<rect x="5" y="10" width="14" height="11" rx="1"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/>',
     close: '<path d="m5 5 14 14M19 5 5 19"/>',
@@ -94,9 +98,10 @@
     return { label: on ? 'Mute rain' : 'Play rain', name: on ? 'volume' : 'mute', on };
   }
 
-  function soundButton() {
-    const s = soundInfo();
-    return smallButton('audio', s.label, s.name, 'aria-pressed="' + s.on + '"');
+  function voiceHud() {
+    const enabled = Boolean(window.gameVoice?.enabled());
+    const title = enabled ? 'Mute spoken narration' : 'Enable spoken narration';
+    return smallButton('voice-toggle', title, enabled ? 'speechOn' : 'speechOff', 'aria-pressed="' + enabled + '"');
   }
 
   function syncSound() {
@@ -108,6 +113,77 @@
       button.innerHTML = icon(s.name) + (button.closest('.menu-actions') ? '<span>' + s.label + '</span>' : '');
     }
   }
+
+  let voiceContext = null;
+  let pendingClip = null;
+  let voiceRequest = 0;
+
+  function voiceButton(id, subject, objective = false) {
+    const title = 'Listen to ' + subject;
+    return '<button type="button" class="voice-play' + (objective ? ' voice-objective' : '') + '" data-ga="voice-play" data-voice="' + esc(id) +
+      '" data-subject="' + esc(subject) + '" title="' + esc(title) + '" aria-label="' + esc(title) + '" aria-pressed="false">' +
+      icon('narrate') + (objective ? '' : '<span>Listen</span>') + '</button>';
+  }
+
+  function syncVoice() {
+    const voice = window.gameVoice;
+    const playing = pendingClip || voice?.current() || null;
+    for (const button of document.querySelectorAll('[data-ga="voice-play"]')) {
+      const on = button.dataset.voice === playing;
+      const title = (on ? 'Stop reading ' : 'Listen to ') + button.dataset.subject;
+      button.title = title;
+      button.setAttribute('aria-label', title);
+      button.setAttribute('aria-pressed', String(on));
+      button.classList.toggle('is-speaking', on);
+      button.innerHTML = icon(on ? 'stop' : 'narrate') + (button.classList.contains('voice-objective') ? '' : '<span>' + (on ? 'Stop' : 'Listen') + '</span>');
+    }
+    const on = Boolean(voice?.enabled());
+    const hud = getGame()?.querySelector('.scene-actions [data-ga="voice-toggle"]');
+    if (hud) {
+      const label = on ? 'Mute spoken narration' : 'Enable spoken narration';
+      hud.title = label;
+      hud.setAttribute('aria-label', label);
+      hud.setAttribute('aria-pressed', String(on));
+      hud.innerHTML = icon(on ? 'speechOn' : 'speechOff');
+    }
+    const setting = dialog?.querySelector('[data-ga="voice-toggle"]');
+    if (setting) {
+      setting.setAttribute('aria-pressed', String(on));
+      setting.querySelector('.voice-setting').textContent = on ? 'On' : 'Off';
+    }
+  }
+
+  function stopVoice() {
+    voiceRequest++;
+    pendingClip = null;
+    window.gameVoice?.stop();
+    syncVoice();
+  }
+
+  async function playVoice(manual) {
+    const id = voiceContext;
+    if (!id) return;
+    const request = ++voiceRequest;
+    pendingClip = id;
+    syncVoice();
+    let started = false;
+    try {
+      started = await window.gameVoice?.play(id);
+    } catch { /* An unavailable recording leaves the caption on screen. */ }
+    if (request !== voiceRequest) return;
+    pendingClip = null;
+    syncVoice();
+    if (!started && manual) notify('The recording could not play. Select Listen to try again.');
+  }
+
+  function setVoiceContext(id, automatic = true) {
+    if (id === voiceContext) { syncVoice(); return; }
+    stopVoice();
+    voiceContext = id;
+    if (id && automatic && window.gameVoice?.enabled()) playVoice(false);
+  }
+
+  function objectiveId() { return 'objective-' + (state.chapter + 1); }
 
   function syncFullscreen() {
     const active = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
@@ -139,9 +215,11 @@
     document.body.append(dialog);
     dialog.addEventListener('close', () => {
       if (dialog.open) return;
+      setVoiceContext(objectiveId(), false);
       document.body.classList.remove('g-modal-open');
       if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true });
     });
+    dialog.addEventListener('cancel', () => setVoiceContext(objectiveId(), false));
     dialog.addEventListener('click', e => {
       if (e.target !== dialog) return;
       const r = dialog.getBoundingClientRect();
@@ -149,7 +227,7 @@
     });
   }
 
-  function openPanel(type, label, title, content) {
+  function openPanel(type, label, title, content, voiceId = null) {
     initDialog();
     if (!dialog.open) lastFocus = document.activeElement;
     dialog.className = 'g-dialog ' + type;
@@ -159,10 +237,14 @@
     if (!dialog.open) { dialog.showModal(); document.body.classList.add('g-modal-open'); }
     dialog.scrollTop = 0;
     dialog.querySelector('#g-modal-title').focus({ preventScroll: true });
+    setVoiceContext(voiceId);
   }
 
   function closeDialog() {
-    if (dialog?.open) dialog.close();
+    if (dialog?.open) {
+      setVoiceContext(objectiveId(), false);
+      dialog.close();
+    }
   }
 
   function notify(message) {
@@ -233,8 +315,8 @@
       '<button type="button" class="pan-control pan-left" data-ga="pan-left" aria-label="Look left" hidden>' + icon('left') + '</button>' +
       '<button type="button" class="pan-control pan-right" data-ga="pan-right" aria-label="Look right" hidden>' + icon('right') + '</button>' +
       '<header class="scene-top"><div class="scene-heading"><p class="scene-chapter">Tsujigiri <span aria-hidden="true">／</span> ' +
-      chapterLabel(state.chapter) + '</p><h1 id="scene-title" class="scene-place" tabindex="-1">' + esc(scene.place) + '</h1><p class="scene-lead">' + esc(scene.lead) +
-      '</p></div><div class="scene-actions">' + soundButton() + smallButton('fullscreen', 'Enter full screen', 'expand') + smallButton('menu', 'Pause menu', 'pause') +
+      chapterLabel(state.chapter) + '</p><h1 id="scene-title" class="scene-place" tabindex="-1">' + esc(scene.place) + '</h1><div class="scene-objective"><p class="scene-lead">' + esc(scene.lead) +
+      '</p>' + voiceButton(objectiveId(), 'the scene objective', true) + '</div></div><div class="scene-actions">' + voiceHud() + smallButton('fullscreen', 'Enter full screen', 'expand') + smallButton('menu', 'Pause menu', 'pause') +
       '</div></header><footer class="scene-bottom"><div class="scene-progress"><span class="progress-marks" aria-hidden="true">' + marks + '</span>' +
       '<span class="progress-count" role="status">' + seenCount + ' / ' + chapter.items.length + ' examined</span><span class="scene-tip"' + (seenCount ? ' hidden' : '') +
       '><span class="tip-point">Select a marker to examine it.</span><span class="tip-pan">Swipe to explore.</span></span></div><div class="scene-dock">' + t('casebook','book','Casebook') +
@@ -253,9 +335,10 @@
     scheduleFit();
   }
 
-  function enterScene(i) {
+  function enterScene(i, automatic = true) {
     if (!Number.isInteger(i) || i < 0 || i > state.solved || i >= getCase().acts.length) return;
     closeDialog();
+    setVoiceContext(null, false);
     lastFocus = null;
     state.chapter = i;
     state.started = true;
@@ -263,6 +346,7 @@
     bookChapter = i;
     save();
     renderScene();
+    setVoiceContext(objectiveId(), automatic);
     getGame().querySelector('#scene-title').focus({ preventScroll:true });
     if (!persistent) notify('Device storage is unavailable. This case lasts for this session.');
   }
@@ -271,7 +355,7 @@
     load();
     document.body.classList.add('g-playing');
     getGame().hidden = false;
-    enterScene(state.chapter);
+    enterScene(state.chapter, false);
   }
 
   function pinButton(key) {
@@ -300,7 +384,7 @@
     openPanel('g-casebook-dialog','Kageura archive','Casebook','<nav class="book-tabs" aria-label="Chapter register">' + tabs + '</nav><section class="book-page"><h3>' +
       esc(cur.title) + '</h3><p>' + esc(cur.brief) + '</p><div class="book-list">' + rows + '</div>' +
       '<details class="book-record"><summary>Case record</summary><div class="g-prose">' + (index === 0 ? paragraphs(getCase().intro) : '') + paragraphs(cur.event) +
-      (index < state.solved ? paragraphs(cur.puzzle.success) : '') + '</div></details></section><footer class="book-footer">' + compareButton() +
+      (index < state.solved ? paragraphs(cur.puzzle.success) + '<button type="button" class="g-secondary" data-ga="finding-record" data-index="' + index + '">Read the recorded finding</button>' : '') + '</div></details></section><footer class="book-footer">' + compareButton() +
       (index !== state.chapter ? '<button class="g-primary" type="button" data-ga="chapter" data-index="' + index + '">Visit this scene</button>' :
         '<button class="g-secondary" type="button" data-ga="close">Return to scene</button>') + '</footer>');
   }
@@ -355,10 +439,11 @@
       '<button type="button" class="g-secondary" data-ga="book-tab" data-index="' + index + '">' + icon('book') + ' Casebook</button></footer>';
     if (item.kind === 'witness') {
       const j = Math.min(item.body.length - 1, Math.max(0, page));
+      const voiceId = item.id + '-' + (j + 1);
       openPanel('g-witness-dialog', chapterLabel(index) + ' · Witness', item.title,
         '<div class="witness-scene">' + (item.asset ? '<img class="witness-portrait" src="' + esc(item.asset) + '" alt="">' : '') +
         '<div class="witness-speech"><p class="g-label">' + esc(item.subtitle) + '</p><blockquote class="witness-line" aria-live="polite">' + esc(item.body[j]) + '</blockquote>' +
-        pager('speech',j,item.body.length,key) + '</div></div>' + tail);
+        voiceButton(voiceId,'this witness statement') + pager('speech',j,item.body.length,key) + '</div></div>' + tail, voiceId);
     } else {
       openPanel('g-reader-dialog g-kind-' + item.kind,chapterLabel(index) + ' · ' + (kindNames[item.kind] || 'Exhibit'),item.title,
         '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p><div class="g-reader-content">' + readBody(item,true) + '</div>' + tail);
@@ -399,15 +484,19 @@
       esc(state.notes) + '</textarea><p id="g-note-status" role="status">' + (persistent ? 'Saved as you write on this device.' : 'Storage unavailable. Notes last for this session.') + '</p></div>');
   }
 
+  function recordedFinding(i) {
+    if (!Number.isInteger(i) || i < 0 || i >= state.solved) return;
+    const p = getCase().acts[i].puzzle;
+    const last = i === getCase().acts.length-1;
+    const voiceId = 'finding-' + (i + 1);
+    openPanel('g-finding-dialog',chapterLabel(i) + ' · Finding entered',p.title,'<section class="g-finding"><div class="g-prose">' + paragraphs(p.success) +
+      '</div>' + voiceButton(voiceId,'this finding') + '<button type="button" class="g-primary" data-ga="' + (last ? 'ending' : 'chapter') + '" data-index="' + (i+1) + '">' +
+      (last ? 'Read closing entry' : 'Enter ' + chapterLabel(i+1)) + '</button></section>', voiceId);
+  }
+
   function showFinding() {
     const p = act().puzzle, i = state.chapter;
-    if (i < state.solved) {
-      const last = i === getCase().acts.length-1;
-      openPanel('g-finding-dialog',chapterLabel(i) + ' · Finding entered',p.title,'<section class="g-finding"><div class="g-prose">' + paragraphs(p.success) +
-        '</div><button type="button" class="g-primary" data-ga="' + (last ? 'ending' : 'chapter') + '" data-index="' + (i+1) + '">' +
-        (last ? 'Read closing entry' : 'Enter ' + chapterLabel(i+1)) + '</button></section>');
-      return;
-    }
+    if (i < state.solved) { recordedFinding(i); return; }
     const shown = Math.max(0, Math.min(p.hints.length, Number(state.hints[i]) || 0));
     const hints = '<div class="g-hints">' + (shown ? '<ol>' + p.hints.slice(0,shown).map(h => '<li>' + esc(h) + '</li>').join('') + '</ol>' : '') +
       (shown < p.hints.length ? '<button class="g-text-button" type="button" data-ga="hint">' + (shown ? 'Reveal next hint' : 'Reveal a hint') + '</button>' : '') + '</div>';
@@ -451,32 +540,45 @@
     if (state.solved !== getCase().acts.length) return;
     const end = getCase().ending;
     const j = Math.min(end.paragraphs.length - 1, Math.max(0,page));
+    const voiceId = 'epilogue-' + (j + 1);
     state.view = 'ending'; save();
     openPanel('g-ending-dialog','The closing entry',end.title,'<div class="g-ending"><div class="g-prose">' + paragraphs(end.paragraphs[j]) + '</div>' +
-      pager('ending',j,end.paragraphs.length) + (j === end.paragraphs.length - 1 ? '<div class="g-end-actions"><button type="button" class="g-secondary" data-ga="history">Historical notes</button>' +
-        '<button type="button" class="g-secondary" data-ga="reset">Start fresh</button></div>' : '') + '</div>');
+      voiceButton(voiceId,'this closing entry') + pager('ending',j,end.paragraphs.length) + (j === end.paragraphs.length - 1 ? '<div class="g-end-actions"><button type="button" class="g-secondary" data-ga="history">Historical notes</button>' +
+        '<button type="button" class="g-secondary" data-ga="reset">Start fresh</button></div>' : '') + '</div>', voiceId);
+  }
+
+  function prologue(page = 0) {
+    const lines = getCase().intro;
+    const j = Math.max(0, Math.min(page, lines.length - 1));
+    const voiceId = 'prologue-' + (j + 1);
+    openPanel('g-ending-dialog g-prologue-dialog','The Kageura Crossing','Opening story','<div class="g-ending"><div class="g-prose">' +
+      paragraphs(lines[j]) + '</div>' + voiceButton(voiceId,'this opening passage') + pager('prologue',j,lines.length) + '</div>', voiceId);
   }
 
   function history() {
     const h = getCase().history;
     openPanel('g-history-dialog','Kageura archive','Historical notes','<div class="g-prose">' + paragraphs(h.notes) + '</div><ul class="g-sources">' +
-      h.sources.filter(s => /^https?:\/\//.test(s.url)).map(s => '<li><a target="_blank" rel="noopener noreferrer" href="' + esc(s.url) + '">' + esc(s.title) + '</a></li>').join('') + '</ul>');
+      h.sources.filter(s => /^https?:\/\//.test(s.url)).map(s => '<li><a target="_blank" rel="noopener noreferrer" href="' + esc(s.url) + '">' + esc(s.title) + '</a></li>').join('') + '</ul>' +
+      '<p class="voice-credit">Spoken narration was generated with Kokoro-82M. <a href="https://huggingface.co/hexgrad/Kokoro-82M#creative-commons-attribution" target="_blank" rel="noopener noreferrer">Model training credits</a></p>');
   }
 
   function menu() {
     const s = soundInfo();
     openPanel('g-menu-dialog','Tsujigiri','Pause menu','<div class="menu-actions"><button class="g-primary" type="button" data-ga="close">Return to scene</button>' +
+      '<button type="button" class="menu-voice g-secondary" data-ga="voice-toggle" aria-pressed="false">' + icon('narrate') +
+      '<span>Spoken narration</span><strong class="voice-setting">Off</strong></button>' +
+      '<button type="button" class="g-secondary" data-ga="prologue">' + icon('book') + ' Opening story</button>' +
       '<button type="button" class="g-secondary" data-ga="guide">' + icon('book') + ' How to play</button>' +
       '<button type="button" class="g-secondary" data-ga="audio">' + icon(s.name) + '<span>' + s.label + '</span></button>' +
       '<button type="button" class="g-secondary" data-ga="fullscreen">' + icon('expand') + '<span>Enter full screen</span></button>' +
       '<label class="menu-theme" for="game-theme">Appearance<select id="game-theme"><option value="system">Device setting</option><option value="light">Lantern light</option><option value="dark">Night ink</option></select></label>' +
       '<button class="g-secondary" type="button" data-ga="history">Historical notes</button><button class="g-secondary" type="button" data-ga="reset">Start fresh</button></div>');
     dialog.querySelector('#game-theme').value = window.sceneTheme?.() || 'system';
-    syncSound(); syncFullscreen();
+    syncSound(); syncFullscreen(); syncVoice();
   }
 
   function guide() {
-    openPanel('g-guide-dialog','Field guide','How to play','<div class="g-prose"><p>Select a marker to speak with a witness or inspect an object. On a narrow screen, swipe sideways to explore.</p>' +
+    openPanel('g-guide-dialog','Field guide','How to play','<div class="g-prose"><p>Select a marker to speak with a witness or inspect an object. Swipe to look around. The speech bubble turns on narration.</p>' +
       '<p>Open the casebook to revisit evidence. Pin two records to compare them. Keep shared notes in the notebook.</p><p>Choose <strong>Make finding</strong> when the group agrees. Each chapter offers optional hints.</p></div>' +
       '<details class="book-record"><summary>Roles for two to four players</summary><dl>' + getCase().roles.map(r => '<div><dt>' + esc(r.name) + '</dt><dd>' + esc(r.task) + '</dd></div>').join('') +
       '</dl><p>With two players, take two roles each and switch next chapter.</p></details><footer class="book-footer"><button class="g-primary" type="button" data-ga="close">Return to scene</button></footer>');
@@ -493,6 +595,23 @@
     const {ga,index,key,page} = button.dataset;
     switch (ga) {
       case 'close': closeDialog(); break;
+      case 'voice-play':
+        if (button.dataset.voice !== voiceContext) break;
+        if (pendingClip === voiceContext || window.gameVoice?.current() === voiceContext) stopVoice();
+        else playVoice(true);
+        break;
+      case 'voice-toggle': {
+        const voice = window.gameVoice;
+        if (!voice) { notify('Spoken narration is unavailable in this browser.'); break; }
+        const next = !voice.enabled();
+        if (!next) stopVoice();
+        voice.setEnabled(next);
+        syncVoice();
+        if (next && !dialog?.open && voiceContext === objectiveId()) playVoice(true);
+        notify(next ? 'Spoken narration on. Voices will play as you investigate.' : 'Spoken narration off.');
+        break;
+      }
+      case 'prologue': prologue(Number(page) || 0); break;
       case 'audio': window.toggleAmbience?.(); break;
       case 'fullscreen': fullscreen(); break;
       case 'pan-left':
@@ -514,6 +633,7 @@
       case 'notebook': notebook(); break;
       case 'compare': showComparison(); break;
       case 'pin': togglePin(key); break;
+      case 'finding-record': recordedFinding(Number(index)); break;
       case 'finding': showFinding(); break;
       case 'ending': showEnding(Number(page) || 0); break;
       case 'hint':
@@ -560,6 +680,9 @@
   document.addEventListener('webkitfullscreenchange',syncFullscreen);
   window.addEventListener('resize',() => { if (state?.started) scheduleFit(); });
   window.addEventListener('ambiencechange',syncSound);
+  window.addEventListener('gamevoicechange',syncVoice);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stopVoice(); });
+  window.addEventListener('pagehide',stopVoice);
   window.openInvestigation = openInvestigation;
   window.openNotebook = notebook;
   window.clearSavedInvestigation = clearSaved;

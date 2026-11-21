@@ -6,6 +6,7 @@
   let palette = 'system';
   let audio;
   let rain;
+  let rainLevel;
   let soundBusy = false;
   let toastTimer;
 
@@ -32,7 +33,7 @@
   applyPalette();
 
   function announce(message) {
-    const status = document.getElementById('stage-status');
+    const status = document.querySelector('.g-dialog[open] .g-notice') || document.getElementById('stage-status');
     clearTimeout(toastTimer);
     status.textContent = message;
     status.hidden = false;
@@ -61,7 +62,8 @@
     filter.frequency.value = 1600;
     filter.Q.value = .4;
     const level = context.createGain();
-    level.gain.value = .18;
+    rainLevel = level;
+    level.gain.value = window.gameVoice?.current() ? .045 : .18;
     loop.connect(filter).connect(level).connect(context.destination);
     loop.start();
     return loop;
@@ -98,5 +100,9 @@
     return window.ambienceOn();
   };
 
+  window.addEventListener('gamevoicechange', () => {
+    if (rainLevel) rainLevel.gain.setTargetAtTime(window.gameVoice.current() ? .045 : .18, audio.currentTime, .12);
+  });
+  window.addEventListener('gamevoiceerror', () => announce('The voice track could not load. Select Listen to retry.'));
   window.openInvestigation();
 })();

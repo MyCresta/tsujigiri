@@ -271,3 +271,11 @@
   .g-menu-dialog .g-modal-head, .g-ending-dialog .g-modal-head { min-height: 4.5rem; }
 }
 @media (prefers-reduced-motion: reduce) { .g-dialog[open] { animation: none; } }
+.g-dialog .voice-play, .g-dialog .menu-voice {
+  display:inline-flex;align-items:center;gap:.45rem;min-height:37px;
+  padding:.35rem .7rem;border:1px solid var(--g-rule);border-radius:1px;
+  color:var(--g-ink);background:var(--g-soft);font:600 .9rem/1.2 var(--sans);
+}
+.g-dialog .voice-play:is(:hover,.is-speaking), .g-dialog .menu-voice[aria-pressed=true] { border-color:var(--g-red);color:var(--g-red); }
+.g-dialog .voice-play .g-icon { width:16px;height:16px; }
+.g-dialog .voice-setting { margin-left:auto;color:var(--g-red);font-weight:700; }
