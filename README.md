@@ -6,7 +6,11 @@ A shared-screen murder mystery for two to four players. In a fictional Japanese 
 
 ## At the table
 
-Open the case on one screen and choose **Begin investigation**. The field guide explains how to share the reading, take notes, and submit findings. Hints are optional. Progress and the shared notebook save in the current browser.
+Open the game on one screen. It starts at the Reed Inn, or resumes the team’s saved scene. Select a mark on the artwork to speak to a witness or inspect an object. On narrower screens, swipe or use the side controls to look around.
+
+**Casebook** gathers unlocked evidence for comparison. **Notebook** saves shared observations, and **Make finding** records the team’s answer. Hints are optional. The pause menu holds the field guide, replay, and appearance settings. The night palette follows the device by default.
+
+Press **F** for browser fullscreen, **B** for the casebook, **N** for notes, or **Escape** to close a panel or open the pause menu.
 
 ## Run locally
 
@@ -18,4 +22,4 @@ GitHub Pages serves the root of the `gh-pages` branch. After testing a change on
 
 ## Credits
 
-The story, map, evidence, interface, and woodblock-inspired illustrations were created for this game. The game includes historical background and links to references. Cormorant Garamond, DM Sans, and the Noto Serif JP title glyphs are distributed under the SIL Open Font License. The license texts are included in the fonts directory.
+The story, map, evidence, interface, and woodblock-inspired illustrations were created for this game. The game includes historical background and links to references. Cormorant Garamond and DM Sans are distributed under the SIL Open Font License. The license texts are included in the fonts directory.

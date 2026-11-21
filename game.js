@@ -16,9 +16,12 @@
     lock: '<rect x="5" y="10" width="14" height="11" rx="1"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/>',
     close: '<path d="m5 5 14 14M19 5 5 19"/>',
     check: '<path d="m4 12 5 5 11-11"/>',
-    back: '<path d="M20 12H4m6-6-6 6 6 6"/>',
+    left: '<path d="m15 5-7 7 7 7"/>',
+    right: '<path d="m9 5 7 7-7 7"/>',
     pin: '<path d="M6 3h12v18l-6-4-6 4z"/>',
     pen: '<path d="m4 16 12-12 4 4L8 20l-5 1zM14 6l4 4"/>',
+    book: '<path d="M12 6Q7 3 2 5v14q5-2 10 1 5-3 10-1V5q-5-2-10 1v14"/>',
+    pause: '<path d="M8 5v14M16 5v14" stroke-width="2.5"/>',
     gate: '<path d="M2 5q10 3 20 0M3 10h18M7 7 6 21m11-14 1 14M12 7v3"/>'
   };
   const kindNames = { document: 'Document', map: 'Map', object: 'Object', witness: 'Testimony' };
@@ -28,7 +31,7 @@
   const getCase = () => window.CASEFILE;
   const getGame = () => document.getElementById('game');
   const defaultState = () => ({
-    started: false, view: 'intro', chapter: 0, solved: 0, notes: '',
+    started: false, view: 'desk', chapter: 0, solved: 0, notes: '',
     seen: [], compare: [], hints: {}, drafts: {}
   });
   let state;
@@ -47,10 +50,11 @@
       state.started = saved.started === true;
       state.solved = Math.min(count, Math.max(0, Number.parseInt(saved.solved, 10) || 0));
       state.chapter = Math.max(0, Math.min(Number.parseInt(saved.chapter, 10) || 0, count - 1, state.solved));
-      state.view = saved.view === 'ending' && state.solved === count ? 'ending' : saved.view === 'desk' ? 'desk' : 'intro';
+      if (saved.view === 'intro') state.chapter = 0;
+      if (saved.view === 'ending' && state.solved === count) state.chapter = count - 1;
       state.notes = typeof saved.notes === 'string' ? saved.notes : '';
-      state.seen = Array.isArray(saved.seen) ? saved.seen.filter(k => typeof k === 'string') : [];
-      state.compare = Array.isArray(saved.compare) ? saved.compare.filter(k => typeof k === 'string' && getItem(k)).slice(0, 2) : [];
+      state.seen = Array.isArray(saved.seen) ? [...new Set(saved.seen.filter(k => getItem(k)))] : [];
+      state.compare = Array.isArray(saved.compare) ? [...new Set(saved.compare.filter(k => getItem(k)))].slice(0, 2) : [];
       for (const k of ['drafts', 'hints']) {
         if (saved[k] && typeof saved[k] === 'object' && !Array.isArray(saved[k])) state[k] = saved[k];
       }
@@ -67,332 +71,497 @@
   }
 
   function getItem(key) {
-    const [a, i] = String(key).split('.').map(Number);
+    if (typeof key !== 'string' || !/^\d+\.\d+$/.test(key)) return null;
+    const [a, i] = key.split('.').map(Number);
     if (!Number.isInteger(a) || a > state.solved || a < 0 || !Number.isInteger(i) || i < 0) return null;
     return getCase()?.acts?.[a]?.items?.[i];
   }
 
-  function focusHeading(id = 'g-heading', scroll = true) {
-    const el = document.getElementById(id);
-    if (el) {
-      el.focus({ preventScroll: true });
-      if (scroll) el.scrollIntoView({ block: 'start' });
+  const chapterNumber = n => roman[n] || n + 1;
+  const act = () => getCase().acts[state.chapter];
+  const chapterLabel = n => 'Chapter ' + chapterNumber(n);
+  let bookChapter = 0;
+  let resizeObserver;
+  let frameRequest;
+  let sceneGeneration = 0;
+
+  function smallButton(action, label, name, extra = '') {
+    return '<button type="button" class="scene-icon" data-ga="' + action + '" title="' + esc(label) + '" aria-label="' + esc(label) + '" ' + extra + '>' + icon(name) + '</button>';
+  }
+
+  function soundInfo() {
+    const on = Boolean(window.ambienceOn?.());
+    return { label: on ? 'Mute rain' : 'Play rain', name: on ? 'volume' : 'mute', on };
+  }
+
+  function soundButton() {
+    const s = soundInfo();
+    return smallButton('audio', s.label, s.name, 'aria-pressed="' + s.on + '"');
+  }
+
+  function syncSound() {
+    const s = soundInfo();
+    for (const button of document.querySelectorAll('[data-ga="audio"]')) {
+      button.title = s.label;
+      button.setAttribute('aria-label', s.label);
+      button.setAttribute('aria-pressed', String(s.on));
+      button.innerHTML = icon(s.name) + (button.closest('.menu-actions') ? '<span>' + s.label + '</span>' : '');
     }
   }
 
-  function addDialog() {
+  function syncFullscreen() {
+    const active = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+    const label = active ? 'Leave full screen' : 'Enter full screen';
+    for (const button of document.querySelectorAll('[data-ga="fullscreen"]')) {
+      button.title = label;
+      button.setAttribute('aria-label', label);
+      button.setAttribute('aria-pressed', String(active));
+      if (button.closest('.menu-actions')) button.querySelector('span').textContent = label;
+    }
+  }
+
+  async function fullscreen() {
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        const root = document.documentElement;
+        await (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+      }
+    } catch { notify('Full screen is unavailable in this browser view.'); }
+  }
+
+  function initDialog() {
     if (dialog) return;
     dialog = document.createElement('dialog');
     dialog.className = 'g-dialog';
     dialog.setAttribute('aria-labelledby', 'g-modal-title');
-    document.body.appendChild(dialog);
+    document.body.append(dialog);
     dialog.addEventListener('close', () => {
+      if (dialog.open) return;
       document.body.classList.remove('g-modal-open');
-      if (lastFocus?.isConnected && !lastFocus.closest('[hidden]')) lastFocus.focus({ preventScroll: true });
+      if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true });
     });
-    dialog.addEventListener('click', event => {
-      if (event.target !== dialog) return;
-      const rect = dialog.getBoundingClientRect();
-      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeDialog();
+    dialog.addEventListener('click', e => {
+      if (e.target !== dialog) return;
+      const r = dialog.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeDialog();
     });
   }
 
-  function openDialog(content, className = '') {
-    addDialog();
-    const alreadyOpen = dialog.open;
-    if (!alreadyOpen) lastFocus = document.activeElement;
-    dialog.className = 'g-dialog ' + className;
-    dialog.innerHTML = '<div class="g-modal-shell">' + content + '</div>';
-    if (!alreadyOpen) {
-      dialog.showModal();
-      document.body.classList.add('g-modal-open');
-    }
+  function openPanel(type, label, title, content) {
+    initDialog();
+    if (!dialog.open) lastFocus = document.activeElement;
+    dialog.className = 'g-dialog ' + type;
+    dialog.innerHTML = '<div class="g-modal-shell"><header class="g-modal-head"><div><p class="g-label">' + esc(label) +
+      '</p><h2 id="g-modal-title" tabindex="-1">' + esc(title) + '</h2></div><button type="button" class="g-icon-button g-close" data-ga="close" aria-label="Close panel">' +
+      icon('close') + '</button></header>' + content + '<p role="status" class="g-notice" hidden></p></div>';
+    if (!dialog.open) { dialog.showModal(); document.body.classList.add('g-modal-open'); }
     dialog.scrollTop = 0;
-    const heading = dialog.querySelector('#g-modal-title');
-    if (heading) heading.focus({ preventScroll: true });
+    dialog.querySelector('#g-modal-title').focus({ preventScroll: true });
   }
 
   function closeDialog() {
     if (dialog?.open) dialog.close();
   }
 
-  function returnToTitle() {
-    closeDialog();
-    getGame().hidden = true;
-    document.body.classList.remove('g-playing');
-    window.showTitle?.();
-    if (!window.showTitle) document.getElementById('title-screen').hidden = false;
-  }
-
-  const closeButton = () => '<button class="g-icon-button g-close" data-ga="close" aria-label="Close">' + icon('close') + '</button>';
-  const modalHead = (label, title) => '<header class="g-modal-head"><div><p class="g-label">' + esc(label) + '</p><h2 id="g-modal-title" tabindex="-1">' + esc(title) + '</h2></div>' + closeButton() + '</header>';
-
-  function showNotice(message) {
-    const el = (dialog?.open ? dialog.querySelector('.g-notice') : null) || getGame()?.querySelector('.g-notice');
+  function notify(message) {
+    const el = (dialog?.open ? dialog : getGame()).querySelector('.g-notice');
     if (!el) return;
     clearTimeout(noticeTimer);
-    el.textContent = message;
     el.hidden = false;
-    noticeTimer = setTimeout(() => { el.hidden = true; el.textContent = ''; }, 4200);
+    el.textContent = message;
+    noticeTimer = setTimeout(() => { el.hidden = true; }, 3800);
   }
 
-  function chapterNav() {
-    const file = getCase();
-    return '<nav class="g-chapters" aria-label="Case chapters"><button data-ga="intro" ' + (state.view === 'intro' ? 'aria-current="page"' : '') +
-      '>Opening file</button>' + file.acts.map((act, i) => {
-        const sealed = i > state.solved || (!state.started && i === 0);
-        const current = state.view === 'desk' && state.chapter === i;
-        return '<button data-ga="chapter" data-index="' + i + '" ' + (sealed ? 'disabled title="Sealed chapter" ' : '') + (current ? 'aria-current="page"' : '') + '>' +
-          (sealed ? icon('lock') : i < state.solved ? icon('check') : '') + 'Chapter ' + (roman[i] || i + 1) + '</button>';
-      }).join('') + (state.solved === file.acts.length ? '<button data-ga="ending" ' + (state.view === 'ending' ? 'aria-current="page"' : '') + '>Closing entry</button>' : '') + '</nav>';
-  }
-
-  function render() {
-    const game = getGame();
-    const sound = typeof window.toggleAmbience === 'function' ? soundButton() : '';
-    game.innerHTML = '<div class="g-app"><header class="g-mast"><button class="g-wordmark" data-ga="title" title="Return to title screen"><span class="g-mon">' +
-      '<img src="./assets/mark.svg" alt="" width="34" height="34">' + '</span><span>Tsujigiri</span></button><span class="g-mast-caption">The investigation desk</span><div class="g-tools"><button class="g-tool" data-ga="notebook">' +
-      icon('notebook') + '<span>Notebook</span></button>' + sound +
-      (document.fullscreenEnabled ? '<button class="g-icon-button" data-ga="fullscreen" aria-label="Toggle full screen" title="Toggle full screen">' + icon('expand') + '</button>' : '') +
-      '<button class="g-tool g-title-link" data-ga="title">Title screen</button></div></header><div class="g-frame">' + chapterNav() + (state.view === 'intro' ? intro() : state.view === 'ending' ? ending() : desk()) +
-      '<footer class="g-foot"><span>Kageura Crossing</span><span>' + (persistent ? 'Progress saved on this device' : 'Storage unavailable · Progress lasts for this session') +
-      '</span></footer></div><div class="g-notice" role="status" hidden></div></div>';
-    for (const field of game.querySelectorAll('#g-answer-form select[data-field]')) {
-      field.value = state.drafts[state.chapter]?.[field.dataset.field] || '';
+  function adjustScene(center = false) {
+    const pan = getGame().querySelector('.scene-pan');
+    const world = pan?.firstElementChild;
+    if (!world || !pan.clientWidth || !world.clientWidth) return;
+    const travel = Math.max(0, pan.scrollWidth - pan.clientWidth);
+    if (center) {
+      pan.scrollLeft = travel / 2;
+      pan.scrollTop = Math.max(0, (pan.scrollHeight - pan.clientHeight) / 2);
+    }
+    const canPan = travel > 60;
+    const stage = pan.parentElement;
+    stage.classList.toggle('can-pan', canPan);
+    const prev = stage.querySelector('.pan-left'), next = stage.querySelector('.pan-right');
+    prev.hidden = next.hidden = !canPan;
+    prev.disabled = pan.scrollLeft < 2;
+    next.disabled = travel - pan.scrollLeft < 2;
+    const frame = pan.getBoundingClientRect();
+    const plane = world.getBoundingClientRect();
+    const clamp = (n, low, high) => Math.min(high, Math.max(low, n));
+    for (const point of world.querySelectorAll('.hotspot')) {
+      const y = Number(point.dataset.y);
+      // Keep distant table edges reachable when a wide screen crops the top and bottom.
+      const lowerMargin = Math.min(76, frame.height * .14);
+      const top = clamp(y, 100 * (frame.top - plane.top + 26) / plane.height, 100 * (frame.bottom - plane.top - lowerMargin) / plane.height);
+      point.style.top = top + '%';
     }
   }
 
-  function soundButton() {
-    const on = !!window.ambienceOn?.();
-    return '<button class="g-icon-button" data-ga="audio" aria-label="' + (on ? 'Mute ambience' : 'Enable ambience') + '" title="' +
-      (on ? 'Mute ambience' : 'Enable ambience') + '" aria-pressed="' + on + '">' + icon(on ? 'volume' : 'mute') + '</button>';
+  function scheduleFit() {
+    cancelAnimationFrame(frameRequest);
+    frameRequest = requestAnimationFrame(() => adjustScene(true));
   }
 
-  function intro() {
-    const file = getCase();
-    return '<section class="g-opening"><div class="g-opening-art" role="img" aria-label="A lantern lights a writing table inside a room looking out on a rainy garden"></div>' +
-      '<article class="g-opening-paper"><p class="g-label g-red">The opening file</p><h1 id="g-heading" tabindex="-1">' + esc(file.subtitle || 'The Kageura Crossing') +
-      '</h1>' + (file.setting ? '<p class="g-dateline">' + esc(file.setting) + '</p>' : '') + '<div class="g-prose">' + paragraphs(file.intro) +
-      '</div><button class="g-primary" data-ga="chapter" data-index="' + Math.min(state.solved, file.acts.length - 1) + '">' + (state.solved ? 'Return to investigation' : 'Examine the first exhibits') +
-      '</button></article></section><section class="g-roles"><div><p class="g-label">Around one screen</p><h2>Divide the work</h2><p>With two investigators, take two roles each. Trade roles when a new chapter opens.</p></div><dl>' +
-      (file.roles || []).map(role => '<div><dt>' + esc(role.name) + '</dt><dd>' + esc(role.task) + '</dd></div>').join('') + '</dl></section>';
+  function renderScene() {
+    const scene = window.SCENES[state.chapter];
+    const chapter = act();
+    const ratio = Number(scene.width) / Number(scene.height);
+    const seenCount = chapter.items.filter((_, i) => state.seen.includes(state.chapter + '.' + i)).length;
+    const buttons = scene.spots.map(spot => {
+      const i = chapter.items.findIndex(item => item.id === spot.id);
+      if (i < 0) return '';
+      const item = chapter.items[i], key = state.chapter + '.' + i;
+      const seen = state.seen.includes(key);
+      return '<button type="button" class="hotspot' + (seen ? ' is-seen' : '') + (spot.x > 73 ? ' is-right' : '') +
+        '" data-ga="reader" data-key="' + key + '" data-x="' + spot.x + '" data-y="' + spot.y + '" style="left:' + spot.x + '%;top:' + spot.y + '%" aria-label="' +
+        esc(spot.label || item.title) + ', ' + esc(kindNames[item.kind]) + (seen ? ', examined' : '') + '"><span class="hotspot-dot">' + icon(item.kind) +
+        '</span><span class="hotspot-label">' + esc(spot.label || item.title) + '</span></button>';
+    }).join('');
+    const marks = chapter.items.map((_, i) => '<i' + (state.seen.includes(state.chapter + '.' + i) ? ' class="is-seen"' : '') + '></i>').join('');
+    const t = (a, name, label, extra = '') => '<button type="button" class="dock-button ' + extra + '" data-ga="' + a + '">' + icon(name) + '<span>' + esc(label) + '</span></button>';
+    const done = state.chapter < state.solved;
+    const last = done && state.chapter === getCase().acts.length - 1;
+    getGame().innerHTML = '<section class="scene-stage" aria-labelledby="scene-title"><div class="scene-pan"><div class="scene-world" style="--art-ratio:' +
+      scene.width + '/' + scene.height + ';--image-ratio:' + ratio + ';aspect-ratio:' + scene.width + '/' + scene.height + '"><img class="scene-art" src="' +
+      esc(scene.image) + '" width="' + scene.width + '" height="' + scene.height + '" alt="' + esc(scene.place) + '" draggable="false" fetchpriority="high">' + buttons +
+      '</div></div><div class="scene-shade" aria-hidden="true"></div>' +
+      '<button type="button" class="pan-control pan-left" data-ga="pan-left" aria-label="Look left" hidden>' + icon('left') + '</button>' +
+      '<button type="button" class="pan-control pan-right" data-ga="pan-right" aria-label="Look right" hidden>' + icon('right') + '</button>' +
+      '<header class="scene-top"><div class="scene-heading"><p class="scene-chapter">Tsujigiri <span aria-hidden="true">／</span> ' +
+      chapterLabel(state.chapter) + '</p><h1 id="scene-title" class="scene-place" tabindex="-1">' + esc(scene.place) + '</h1><p class="scene-lead">' + esc(scene.lead) +
+      '</p></div><div class="scene-actions">' + soundButton() + smallButton('fullscreen', 'Enter full screen', 'expand') + smallButton('menu', 'Pause menu', 'pause') +
+      '</div></header><footer class="scene-bottom"><div class="scene-progress"><span class="progress-marks" aria-hidden="true">' + marks + '</span>' +
+      '<span class="progress-count" role="status">' + seenCount + ' / ' + chapter.items.length + ' examined</span><span class="scene-tip"' + (seenCount ? ' hidden' : '') +
+      '><span class="tip-point">Select a marker to examine it.</span><span class="tip-pan">Swipe to explore.</span></span></div><div class="scene-dock">' + t('casebook','book','Casebook') +
+      t('notebook','notebook','Notebook') + t(last ? 'ending' : 'finding','pen',last ? 'Closing entry' : done ? 'Read finding' : 'Make finding','dock-primary') +
+      '</div></footer><p class="g-notice" role="status" hidden></p></section>';
+    syncFullscreen();
+    const pan = getGame().querySelector('.scene-pan');
+    pan.addEventListener('scroll', () => adjustScene(), {passive: true});
+    if (window.ResizeObserver) {
+      resizeObserver?.disconnect();
+      resizeObserver = new ResizeObserver(scheduleFit);
+      resizeObserver.observe(pan);
+    }
+    const generation = ++sceneGeneration;
+    getGame().querySelector('.scene-art').addEventListener('load', () => { if (generation === sceneGeneration) adjustScene(true); }, { once: true });
+    scheduleFit();
   }
 
-  function visual(item, detailed = false) {
-    if (item.asset && item.kind !== 'map') return '<img src="' + esc(item.asset) + '" alt="" ' + (detailed ? '' : 'loading="lazy" ') + '>';
-    if (item.asset) return '<img src="' + esc(item.asset) + '" alt="' + (detailed ? esc(item.caption || item.title) : '') + '" ' + (detailed ? '' : 'loading="lazy" ') + '>';
-    const excerpt = (item.body?.[0] || '').slice(0, 180);
-    return '<div class="g-manuscript" aria-hidden="true"><div class="g-manuscript-type">' + icon(item.kind) + '</div><span>' + esc(item.title) + '</span><i>' + esc(excerpt) + '</i></div>';
+  function enterScene(i) {
+    if (!Number.isInteger(i) || i < 0 || i > state.solved || i >= getCase().acts.length) return;
+    closeDialog();
+    lastFocus = null;
+    state.chapter = i;
+    state.started = true;
+    state.view = 'desk';
+    bookChapter = i;
+    save();
+    renderScene();
+    getGame().querySelector('#scene-title').focus({ preventScroll:true });
+    if (!persistent) notify('Device storage is unavailable. This case lasts for this session.');
   }
 
-  function card(item, i) {
-    const key = state.chapter + '.' + i;
-    return '<article class="g-card"><button class="g-card-open" data-ga="reader" data-key="' + key + '"><span class="g-card-image ' + (item.asset ? 'g-has-image' : '') + '">' + visual(item) +
-      '</span><span class="g-card-copy"><span class="g-card-meta">' + icon(item.kind) + esc(kindNames[item.kind] || 'Exhibit') +
-      '</span><span class="g-card-title">' + esc(item.title) + '</span>' + (item.subtitle ? '<span class="g-card-detail">' + esc(item.subtitle) + '</span>' : '') +
-      '</span></button><div class="g-card-bottom"><span data-gseen="' + key + '">' + (state.seen.includes(key) ? 'Examined' : 'Unexamined') + '</span>' + pinButton(key) + '</div></article>';
+  function openInvestigation() {
+    load();
+    document.body.classList.add('g-playing');
+    getGame().hidden = false;
+    enterScene(state.chapter);
   }
 
   function pinButton(key) {
-    const pinned = state.compare.includes(key);
-    return '<button class="g-pin" data-ga="pin" data-key="' + key + '" aria-pressed="' + pinned + '" title="Keep this exhibit for side-by-side comparison">' +
-      icon('pin') + '<span>' + (pinned ? 'Pinned' : 'Pin exhibit') + '</span></button>';
+    const on = state.compare.includes(key);
+    return '<button type="button" class="g-pin" data-ga="pin" data-key="' + key + '" aria-pressed="' + on + '" aria-label="' + (on ? 'Unpin ' : 'Pin ') +
+      esc(getItem(key).title) + '">' + icon('pin') + '<span>' + (on ? 'Pinned' : 'Pin') + '</span></button>';
   }
 
   function compareButton() {
-    const n = state.compare.length;
-    return '<button class="g-secondary g-compare-btn" data-ga="compare">' + icon('compare') + '<span>Compare exhibits' + (n ? ' (' + n + '/2)' : '') + '</span></button>';
+    return '<button type="button" class="g-secondary g-compare-btn" data-ga="compare">' + icon('compare') + '<span>Compare' +
+      (state.compare.length ? ' (' + state.compare.length + '/2)' : ' exhibits') + '</span></button>';
   }
 
-  function desk() {
-    const act = getCase().acts[state.chapter];
-    return '<section class="g-section-head"><div><p class="g-label g-red">Chapter ' + (roman[state.chapter] || state.chapter + 1) +
-      (act.kicker ? ' <b>／</b> ' + esc(act.kicker) : '') + '</p><h1 id="g-heading" tabindex="-1">' + esc(act.title) + '</h1><div class="g-brief">' + paragraphs(act.brief) +
-      '</div></div><button class="g-primary" data-ga="to-deduction">' + (state.chapter < state.solved ? 'Read finding' : 'Make a deduction') + '</button></section>' +
-      (act.event ? '<aside class="g-event"><span class="g-event-icon">' + icon('gate') + '</span><div><p class="g-label g-red">Entry in the case record</p>' + paragraphs(act.event) + '</div></aside>' : '') +
-      '<div class="g-shelf-head"><h2>Evidence register</h2>' + compareButton() + '</div><div class="g-grid">' + act.items.map(card).join('') +
-      '</div>' + deduction(act);
+  function showBook(index = state.chapter) {
+    if (!Number.isInteger(index) || index < 0 || index > state.solved || index >= getCase().acts.length) return;
+    bookChapter = index;
+    const cur = getCase().acts[index];
+    const tabs = getCase().acts.map((_, i) => '<button type="button" data-ga="book-tab" data-index="' + i + '" ' + (i === index ? 'aria-current="page" ' : '') +
+      (i > state.solved ? 'disabled aria-label="' + chapterLabel(i) + ', sealed"' : '') + '>' + (i > state.solved ? icon('lock') : '') + chapterLabel(i) + '</button>').join('');
+    const rows = cur.items.map((item, i) => {
+      const key = index + '.' + i;
+      return '<div class="book-row"><button class="book-item" type="button" data-ga="reader" data-key="' + key + '">' + icon(item.kind) +
+        '<span><strong>' + esc(item.title) + '</strong><small>' + esc(kindNames[item.kind]) + ' · ' + (state.seen.includes(key) ? 'Examined' : 'Unexamined') +
+        '</small></span></button>' + pinButton(key) + '</div>';
+    }).join('');
+    openPanel('g-casebook-dialog','Kageura archive','Casebook','<nav class="book-tabs" aria-label="Chapter register">' + tabs + '</nav><section class="book-page"><h3>' +
+      esc(cur.title) + '</h3><p>' + esc(cur.brief) + '</p><div class="book-list">' + rows + '</div>' +
+      '<details class="book-record"><summary>Case record</summary><div class="g-prose">' + (index === 0 ? paragraphs(getCase().intro) : '') + paragraphs(cur.event) +
+      (index < state.solved ? paragraphs(cur.puzzle.success) : '') + '</div></details></section><footer class="book-footer">' + compareButton() +
+      (index !== state.chapter ? '<button class="g-primary" type="button" data-ga="chapter" data-index="' + index + '">Visit this scene</button>' :
+        '<button class="g-secondary" type="button" data-ga="close">Return to scene</button>') + '</footer>');
   }
 
-  function deduction(act) {
-    const i = state.chapter;
-    const puzzle = act.puzzle;
-    if (i < state.solved) {
-      const last = i === getCase().acts.length - 1;
-      return '<section class="g-finding" id="g-deduction"><span class="g-finding-icon">' + icon('check') + '</span><div><p class="g-label">Finding entered</p><h2 id="g-deduction-heading" tabindex="-1">' + esc(puzzle.title) + '</h2><div class="g-prose">' + paragraphs(puzzle.success) +
-        '</div><button class="g-primary" data-ga="' + (last ? 'ending' : 'chapter') + '" data-index="' + (i + 1) + '">' + (last ? 'Read the closing entry' : 'Open chapter ' + (roman[i + 1] || i + 2)) + '</button></div></section>';
+  function markExamined(key) {
+    if (state.seen.includes(key)) return;
+    state.seen.push(key);
+    save();
+    const [a, i] = key.split('.').map(Number);
+    if (a !== state.chapter) return;
+    const game = getGame(), point = game.querySelector('.hotspot[data-key="' + key + '"]');
+    if (point) {
+      point.classList.add('is-seen');
+      point.setAttribute('aria-label', point.getAttribute('aria-label') + ', examined');
     }
-    const shown = Math.min(puzzle.hints?.length || 0, Math.max(0, Number(state.hints[i]) || 0));
-    return '<section class="g-deduction" id="g-deduction"><div class="g-deduction-intro"><p class="g-label g-red">Joint deduction</p><h2 id="g-deduction-heading" tabindex="-1">' + esc(puzzle.title) + '</h2><div class="g-prose">' + paragraphs(puzzle.prompt) + '</div>' +
-      (puzzle.hints?.length ? '<div class="g-hints"><h3>Field hints</h3><ol>' + puzzle.hints.slice(0, shown).map(h => '<li>' + esc(h) + '</li>').join('') + '</ol>' +
-        (shown < puzzle.hints.length ? '<button class="g-text-button" data-ga="hint">' + (shown ? 'Reveal the next hint' : 'Reveal a first hint') + '</button>' : '<span class="g-hint-end">All hints opened</span>') + '</div>' : '') +
-      '</div><form class="g-fields" id="g-answer-form">' + puzzle.fields.map((f, j) => '<div><label for="g-answer-' + j + '">' + esc(f.label) + '</label><select required data-field="' + esc(f.id) + '" id="g-answer-' + j + '"><option value="">Select a finding</option>' +
-        f.options.map(o => '<option value="' + esc(o) + '">' + esc(o) + '</option>').join('') + '</select></div>').join('') +
-      '<p class="g-feedback" role="status" id="g-feedback"></p><button class="g-primary" type="submit">Enter this deduction</button></form></section>';
+    game.querySelectorAll('.progress-marks i')[i]?.classList.add('is-seen');
+    const n = act().items.filter((_, j) => state.seen.includes(a + '.' + j)).length;
+    game.querySelector('.progress-count').textContent = n + ' / ' + act().items.length + ' examined';
+    game.querySelector('.scene-tip').hidden = true;
   }
 
-  function readItemBody(item, withTools = false) {
-    const route = withTools && item.id === 'town-plan' && typeof window.mountRouteTool === 'function';
-    const paper = withTools && item.id === 'wrapper' && typeof window.mountPaperTool === 'function';
-    return (item.asset ? '<figure class="g-reader-figure' + (item.kind === 'map' ? ' g-map-figure' : '') + '">' + (route ? '<div class="g-route-mount"></div>' : visual(item, true)) +
-      (item.caption ? '<figcaption>' + esc(item.caption) + '</figcaption>' : '') + '</figure>' : item.caption ? '<p class="g-source-line">' + esc(item.caption) + '</p>' : '') +
-      '<div class="g-prose g-evidence-prose">' + paragraphs(item.body) + '</div>' + (paper ? '<div class="g-paper-mount"></div>' : '') + (item.table ? '<div class="g-table-region" role="region" aria-label="' + esc(item.title) + ' table" tabindex="0"><table><thead><tr>' +
-        item.table.head.map(h => '<th scope="col">' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
-        item.table.rows.map(row => '<tr>' + row.map((cell, k) => k === 0 ? '<th scope="row">' + esc(cell) + '</th>' : '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '');
+  function table(item) {
+    if (!item.table) return '';
+    return '<div class="g-table-region" role="region" aria-label="' + esc(item.title) + ' table" tabindex="0"><table><thead><tr>' +
+      item.table.head.map(h => '<th scope="col">' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' + item.table.rows.map(row => '<tr>' +
+        row.map((cell, i) => i === 0 ? '<th scope="row">' + esc(cell) + '</th>' : '<td>' + esc(cell) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
   }
 
-  function showReader(key) {
+  function readBody(item, tools = false) {
+    const route = tools && item.id === 'town-plan' && window.mountRouteTool;
+    const paper = tools && item.id === 'wrapper' && window.mountPaperTool;
+    let figure = '';
+    if (item.asset) {
+      figure = '<figure class="g-reader-figure' + (item.kind === 'map' ? ' g-map-figure' : '') + '">' + (route ? '<div class="g-route-mount"></div>' :
+        '<img src="' + esc(item.asset) + '" alt="' + (item.kind === 'map' ? esc(item.caption) : '') + '">') + (item.caption ? '<figcaption>' + esc(item.caption) + '</figcaption>' : '') + '</figure>';
+    }
+    return figure + '<div class="g-prose g-evidence-prose">' + paragraphs(item.body) + '</div>' + table(item) + (paper ? '<div class="g-paper-mount"></div>' : '');
+  }
+
+  function pager(action, page, length, key = '') {
+    const nav = (j, label) => '<button type="button" class="g-secondary" data-ga="' + action + '" data-page="' + j + '" data-key="' + key + '">' + label + '</button>';
+    return '<div class="g-pager"><span>' + (page + 1) + ' / ' + length + '</span>' + (page ? nav(page-1, 'Previous') : '') +
+      (page < length-1 ? nav(page+1,'Continue') : '<button type="button" class="g-primary" data-ga="close">Return to scene</button>') + '</div>';
+  }
+
+  function showReader(key, page = 0) {
     const item = getItem(key);
     if (!item) return;
-    const [a, i] = key.split('.').map(Number);
-    if (!state.seen.includes(key)) { state.seen.push(key); save(); }
-    const marker = getGame().querySelector('[data-gseen="' + key + '"]');
-    if (marker) marker.textContent = 'Examined';
-    const items = getCase().acts[a].items;
-    openDialog(modalHead('Chapter ' + (roman[a] || a + 1) + '  /  ' + (kindNames[item.kind] || 'Exhibit'), item.title) +
-      (item.subtitle ? '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p>' : '') + '<div class="g-reader-content">' + readItemBody(item, true) +
-      '</div><footer class="g-reader-tail">' + pinButton(key) + '<div>' + (i ? '<button class="g-secondary" data-ga="reader" data-key="' + a + '.' + (i - 1) + '">Previous exhibit</button>' : '') +
-      (i < items.length - 1 ? '<button class="g-secondary" data-ga="reader" data-key="' + a + '.' + (i + 1) + '">Next exhibit</button>' : '') +
-      '</div></footer><div class="g-notice" role="status" hidden></div>', 'g-reader-dialog');
-    const routeSlot = dialog.querySelector('.g-route-mount');
-    if (routeSlot) window.mountRouteTool(routeSlot, state);
-    const paperSlot = dialog.querySelector('.g-paper-mount');
-    if (paperSlot) window.mountPaperTool(paperSlot);
+    markExamined(key);
+    const index = Number(key.split('.')[0]);
+    const tail = '<footer class="g-reader-tail">' + pinButton(key) +
+      '<button type="button" class="g-secondary" data-ga="book-tab" data-index="' + index + '">' + icon('book') + ' Casebook</button></footer>';
+    if (item.kind === 'witness') {
+      const j = Math.min(item.body.length - 1, Math.max(0, page));
+      openPanel('g-witness-dialog', chapterLabel(index) + ' · Witness', item.title,
+        '<div class="witness-scene">' + (item.asset ? '<img class="witness-portrait" src="' + esc(item.asset) + '" alt="">' : '') +
+        '<div class="witness-speech"><p class="g-label">' + esc(item.subtitle) + '</p><blockquote class="witness-line" aria-live="polite">' + esc(item.body[j]) + '</blockquote>' +
+        pager('speech',j,item.body.length,key) + '</div></div>' + tail);
+    } else {
+      openPanel('g-reader-dialog g-kind-' + item.kind,chapterLabel(index) + ' · ' + (kindNames[item.kind] || 'Exhibit'),item.title,
+        '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p><div class="g-reader-content">' + readBody(item,true) + '</div>' + tail);
+      const route = dialog.querySelector('.g-route-mount'), paper = dialog.querySelector('.g-paper-mount');
+      if (route) window.mountRouteTool(route,state);
+      if (paper) window.mountPaperTool(paper);
+    }
   }
 
   function showComparison() {
-    const selected = state.compare.map(key => ({ key, item: getItem(key) })).filter(x => x.item);
-    const content = selected.map(({ key, item }) => '<article class="g-compare-exhibit"><p class="g-label g-red">' + esc(kindNames[item.kind]) + '</p><h3>' + esc(item.title) +
-      '</h3>' + (item.subtitle ? '<p class="g-reader-subtitle">' + esc(item.subtitle) + '</p>' : '') + readItemBody(item) + '<div class="g-compare-pin">' + pinButton(key) + '</div></article>').join('');
-    openDialog(modalHead('The investigation desk', 'Compare exhibits') + (selected.length < 2 ? '<p class="g-comparison-help">Pin two exhibits in the evidence register to read them side by side. Pins carry across chapters.</p>' : '') +
-      '<div class="g-compare-columns">' + content + '</div>', 'g-wide-dialog');
+    const exhibits = state.compare.map(key => {
+      const item = getItem(key);
+      return '<article class="g-compare-exhibit"><p class="g-label">' + esc(kindNames[item.kind]) + '</p><h3>' + esc(item.title) + '</h3>' + readBody(item) + pinButton(key) + '</article>';
+    }).join('');
+    openPanel('g-wide-dialog', 'Casebook', 'Compare exhibits', (state.compare.length < 2 ? '<p class="g-comparison-help">Pin two records in your casebook to compare them here.</p>' : '') +
+      '<div class="g-compare-columns">' + exhibits + '</div><footer class="book-footer"><button type="button" class="g-secondary" data-ga="book-tab" data-index="' +
+      bookChapter + '">Return to casebook</button></footer>');
   }
 
   function togglePin(key) {
     if (!getItem(key)) return;
     if (state.compare.includes(key)) state.compare = state.compare.filter(k => k !== key);
     else if (state.compare.length < 2) state.compare.push(key);
-    else { showNotice('Two exhibits are pinned. Unpin either one to make room.'); return; }
+    else { notify('Two records are pinned. Unpin one to make room.'); return; }
     save();
-    for (const btn of document.querySelectorAll('[data-ga="pin"]')) {
-      const on = state.compare.includes(btn.dataset.key);
-      btn.setAttribute('aria-pressed', String(on));
-      btn.querySelector('span').textContent = on ? 'Pinned' : 'Pin exhibit';
-    }
-    if (dialog?.open && dialog.classList.contains('g-wide-dialog')) showComparison();
-    const button = getGame().querySelector('.g-compare-btn span');
-    if (button) button.textContent = 'Compare exhibits' + (state.compare.length ? ' (' + state.compare.length + '/2)' : '');
+    if (dialog.classList.contains('g-wide-dialog')) { showComparison(); return; }
+    const old = dialog.querySelector('[data-ga="pin"][data-key="' + key + '"]');
+    const restore = old === document.activeElement;
+    if (old) old.outerHTML = pinButton(key);
+    if (restore) dialog.querySelector('[data-ga="pin"][data-key="' + key + '"]').focus({ preventScroll: true });
+    const compare = dialog.querySelector('.g-compare-btn');
+    if (compare) compare.outerHTML = compareButton();
   }
 
   function notebook() {
     load();
-    openDialog(modalHead('Private to this device', 'Team notebook') + '<div class="g-notes"><label for="g-notes-input">Observations &amp; theories</label>' +
-      '<textarea id="g-notes-input" spellcheck="true" placeholder="Set down names, contradictions and questions for your team…">' + esc(state.notes) +
-      '</textarea><p id="g-note-status" role="status">' + (persistent ? 'Your notes save as you write.' : 'Device storage is unavailable. Notes last for this session.') + '</p></div>');
+    openPanel('g-notebook-dialog','Shared notes','Team notebook','<div class="g-notes"><label for="g-notes-input">Observations &amp; theories</label><textarea id="g-notes-input" placeholder="Where did the accounts disagree?">' +
+      esc(state.notes) + '</textarea><p id="g-note-status" role="status">' + (persistent ? 'Saved as you write on this device.' : 'Storage unavailable. Notes last for this session.') + '</p></div>');
   }
 
-  function ending() {
-    const file = getCase();
-    return '<article class="g-ending"><p class="g-label g-red">The closing entry</p><h1 id="g-heading" tabindex="-1">' + esc(file.ending.title) + '</h1><div class="g-prose">' + paragraphs(file.ending.paragraphs) +
-      '</div><div class="g-end-actions"><button class="g-primary" data-ga="notebook">' + icon('notebook') + ' Team notebook</button><button class="g-secondary" data-ga="reset">Start a fresh case</button></div></article>' +
-      (file.history ? '<details class="g-history"><summary>Historical notes &amp; sources</summary><div class="g-prose">' + paragraphs(file.history.notes) + '</div><ul>' +
-        (file.history.sources || []).filter(s => /^https?:\/\//.test(s.url)).map(s => '<li><a href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">' + esc(s.title) + '</a></li>').join('') + '</ul></details>' : '');
-  }
-
-  function navigate(view, i) {
-    if (view === 'desk') {
-      if (!Number.isInteger(i) || i < 0 || i >= getCase().acts.length || i > state.solved) return;
-      state.chapter = i;
-    }
-    if (view === 'ending' && state.solved !== getCase().acts.length) return;
-    state.view = view;
-    save();
-    render();
-    getGame().scrollTop = 0;
-    window.scrollTo(0, 0);
-    focusHeading('g-heading', false);
-  }
-
-  function openInvestigation() {
-    load();
-    state.started = true;
-    save();
-    document.getElementById('title-screen').hidden = true;
-    document.body.classList.add('g-playing');
-    const game = getGame();
-    game.hidden = false;
-    navigate(state.view, state.chapter);
-  }
-
-  function submitDeduction(event) {
-    if (event.target.id !== 'g-answer-form') return;
-    event.preventDefault();
-    const puzzle = getCase().acts[state.chapter].puzzle;
-    const answers = state.drafts[state.chapter] || {};
-    if (!puzzle.fields.every(f => answers[f.id] === f.answer)) {
-      document.getElementById('g-feedback').textContent = 'The exhibits do not support this account. Recheck the links between your findings and try again.';
+  function showFinding() {
+    const p = act().puzzle, i = state.chapter;
+    if (i < state.solved) {
+      const last = i === getCase().acts.length-1;
+      openPanel('g-finding-dialog',chapterLabel(i) + ' · Finding entered',p.title,'<section class="g-finding"><div class="g-prose">' + paragraphs(p.success) +
+        '</div><button type="button" class="g-primary" data-ga="' + (last ? 'ending' : 'chapter') + '" data-index="' + (i+1) + '">' +
+        (last ? 'Read closing entry' : 'Enter ' + chapterLabel(i+1)) + '</button></section>');
       return;
     }
-    if (state.chapter === state.solved) state.solved++;
+    const shown = Math.max(0, Math.min(p.hints.length, Number(state.hints[i]) || 0));
+    const hints = '<div class="g-hints">' + (shown ? '<ol>' + p.hints.slice(0,shown).map(h => '<li>' + esc(h) + '</li>').join('') + '</ol>' : '') +
+      (shown < p.hints.length ? '<button class="g-text-button" type="button" data-ga="hint">' + (shown ? 'Reveal next hint' : 'Reveal a hint') + '</button>' : '') + '</div>';
+    openPanel('g-finding-dialog',chapterLabel(i) + ' · Joint finding',p.title,'<p class="g-finding-prompt">' + esc(p.prompt) + '</p><form id="g-answer-form" class="g-fields" novalidate>' +
+      p.fields.map((f,j) => '<div><label for="g-answer-' + j + '">' + esc(f.label) + '</label><select id="g-answer-' + j + '" data-field="' + esc(f.id) + '" required><option value="">Choose a finding</option>' +
+        f.options.map(o => '<option value="' + esc(o) + '">' + esc(o) + '</option>').join('') + '</select></div>').join('') +
+      '<p id="g-feedback" class="g-feedback" role="status"></p><button class="g-primary" type="submit">Enter finding</button></form>' + hints);
+    for (const field of dialog.querySelectorAll('select[data-field]')) field.value = state.drafts[i]?.[field.dataset.field] || '';
+  }
+
+  function submitFinding(event) {
+    const form = event.target;
+    if (form.id !== 'g-answer-form') return;
+    event.preventDefault();
+    if (state.chapter !== state.solved) return;
+    const inputs = [...form.querySelectorAll('select[data-field]')];
+    const empty = inputs.find(input => !input.value);
+    const message = form.querySelector('.g-feedback');
+    if (empty) {
+      message.textContent = 'Choose a response for each part of the finding.';
+      empty.focus(); return;
+    }
+    const values = Object.fromEntries(inputs.map(f => [f.dataset.field, f.value]));
+    state.drafts[state.chapter] = values;
+    if (!act().puzzle.fields.every(f => values[f.id] === f.answer)) {
+      save();
+      message.textContent = 'The evidence does not support that account. Check your sources and try again.';
+      return;
+    }
+    state.solved++;
     save();
-    render();
-    focusHeading('g-deduction-heading');
+    // Keep the illustrated scene and its scroll position behind the finding.
+    const dock = getGame().querySelector('.dock-primary');
+    const last = state.chapter === getCase().acts.length-1;
+    dock.dataset.ga = last ? 'ending' : 'finding';
+    dock.querySelector('span').textContent = last ? 'Closing entry' : 'Read finding';
+    showFinding();
+  }
+
+  function showEnding(page = 0) {
+    if (state.solved !== getCase().acts.length) return;
+    const end = getCase().ending;
+    const j = Math.min(end.paragraphs.length - 1, Math.max(0,page));
+    state.view = 'ending'; save();
+    openPanel('g-ending-dialog','The closing entry',end.title,'<div class="g-ending"><div class="g-prose">' + paragraphs(end.paragraphs[j]) + '</div>' +
+      pager('ending',j,end.paragraphs.length) + (j === end.paragraphs.length - 1 ? '<div class="g-end-actions"><button type="button" class="g-secondary" data-ga="history">Historical notes</button>' +
+        '<button type="button" class="g-secondary" data-ga="reset">Start fresh</button></div>' : '') + '</div>');
+  }
+
+  function history() {
+    const h = getCase().history;
+    openPanel('g-history-dialog','Kageura archive','Historical notes','<div class="g-prose">' + paragraphs(h.notes) + '</div><ul class="g-sources">' +
+      h.sources.filter(s => /^https?:\/\//.test(s.url)).map(s => '<li><a target="_blank" rel="noopener noreferrer" href="' + esc(s.url) + '">' + esc(s.title) + '</a></li>').join('') + '</ul>');
+  }
+
+  function menu() {
+    const s = soundInfo();
+    openPanel('g-menu-dialog','Tsujigiri','Pause menu','<div class="menu-actions"><button class="g-primary" type="button" data-ga="close">Return to scene</button>' +
+      '<button type="button" class="g-secondary" data-ga="guide">' + icon('book') + ' How to play</button>' +
+      '<button type="button" class="g-secondary" data-ga="audio">' + icon(s.name) + '<span>' + s.label + '</span></button>' +
+      '<button type="button" class="g-secondary" data-ga="fullscreen">' + icon('expand') + '<span>Enter full screen</span></button>' +
+      '<label class="menu-theme" for="game-theme">Appearance<select id="game-theme"><option value="system">Device setting</option><option value="light">Lantern light</option><option value="dark">Night ink</option></select></label>' +
+      '<button class="g-secondary" type="button" data-ga="history">Historical notes</button><button class="g-secondary" type="button" data-ga="reset">Start fresh</button></div>');
+    dialog.querySelector('#game-theme').value = window.sceneTheme?.() || 'system';
+    syncSound(); syncFullscreen();
+  }
+
+  function guide() {
+    openPanel('g-guide-dialog','Field guide','How to play','<div class="g-prose"><p>Select a marker to speak with a witness or inspect an object. On a narrow screen, swipe sideways to explore.</p>' +
+      '<p>Open the casebook to revisit evidence. Pin two records to compare them. Keep shared notes in the notebook.</p><p>Choose <strong>Make finding</strong> when the group agrees. Each chapter offers optional hints.</p></div>' +
+      '<details class="book-record"><summary>Roles for two to four players</summary><dl>' + getCase().roles.map(r => '<div><dt>' + esc(r.name) + '</dt><dd>' + esc(r.task) + '</dd></div>').join('') +
+      '</dl><p>With two players, take two roles each and switch next chapter.</p></details><footer class="book-footer"><button class="g-primary" type="button" data-ga="close">Return to scene</button></footer>');
+  }
+
+  function clearSaved() {
+    state = defaultState();
+    enterScene(0);
   }
 
   document.addEventListener('click', event => {
-    const btn = event.target.closest?.('[data-ga]');
-    if (!btn || btn.disabled) return;
-    const { ga, index, key } = btn.dataset;
+    const button = event.target.closest?.('[data-ga]');
+    if (!button || button.disabled) return;
+    const {ga,index,key,page} = button.dataset;
     switch (ga) {
       case 'close': closeDialog(); break;
-      case 'title': returnToTitle(); break;
-      case 'intro': navigate('intro'); break;
-      case 'ending': navigate('ending'); break;
-      case 'chapter': navigate('desk', Number(index)); break;
-      case 'reader': showReader(key); break;
-      case 'pin': togglePin(key); break;
-      case 'compare': showComparison(); break;
-      case 'notebook': notebook(); break;
-      case 'to-deduction': focusHeading('g-deduction-heading'); break;
-      case 'fullscreen':
-        (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => showNotice('Full screen is unavailable in this browser view.'));
-        break;
-      case 'audio':
-        Promise.resolve(window.toggleAmbience?.()).then(() => { btn.outerHTML = soundButton(); getGame().querySelector('[data-ga="audio"]')?.focus({ preventScroll: true }); });
-        break;
-      case 'hint': {
-        const i = state.chapter;
-        state.hints[i] = Math.min((Number(state.hints[i]) || 0) + 1, getCase().acts[i].puzzle.hints.length);
-        save(); render();
-        const hint = getGame().querySelector('.g-hints li:last-child');
-        if (hint) { hint.tabIndex = -1; hint.focus(); }
+      case 'audio': window.toggleAmbience?.(); break;
+      case 'fullscreen': fullscreen(); break;
+      case 'pan-left':
+      case 'pan-right': {
+        const pan = getGame().querySelector('.scene-pan');
+        const dir = ga === 'pan-left' ? -1 : 1;
+        const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        pan.scrollBy({left: dir * pan.clientWidth * .7, behavior: smooth ? 'smooth' : 'instant'});
         break;
       }
-      case 'reset':
-        openDialog(modalHead('Replay', 'Open a fresh case?') + '<div class="g-reset"><p>This clears the team notebook, findings, hints and pins on this device.</p><div><button class="g-secondary" data-ga="close">Keep this case</button><button class="g-primary" data-ga="confirm-reset">Start again</button></div></div>');
+      case 'menu': menu(); break;
+      case 'guide': guide(); break;
+      case 'history': history(); break;
+      case 'reader': showReader(key); break;
+      case 'speech': showReader(key,Number(page)); break;
+      case 'casebook': showBook(); break;
+      case 'book-tab': showBook(Number(index)); break;
+      case 'chapter': enterScene(Number(index)); break;
+      case 'notebook': notebook(); break;
+      case 'compare': showComparison(); break;
+      case 'pin': togglePin(key); break;
+      case 'finding': showFinding(); break;
+      case 'ending': showEnding(Number(page) || 0); break;
+      case 'hint':
+        if (state.solved === state.chapter) {
+          state.hints[state.chapter] = Math.min(act().puzzle.hints.length,(Number(state.hints[state.chapter]) || 0) + 1);
+          save(); showFinding();
+          const hint = dialog.querySelector('.g-hints li:last-child'); hint.tabIndex = -1; hint.focus();
+        }
         break;
-      case 'confirm-reset':
-        closeDialog(); state = defaultState(); state.started = true; navigate('intro'); break;
+      case 'reset':
+        openPanel('g-reset-dialog','Replay','Start a fresh case?','<div class="g-reset"><p>This clears the team’s notes, findings, hints and pins on this device.</p><div>' +
+          '<button class="g-secondary" type="button" data-ga="close">Keep this case</button><button class="g-primary" type="button" data-ga="confirm-reset">Start fresh</button></div></div>');
+        break;
+      case 'confirm-reset': clearSaved(); break;
     }
   });
-
-  document.addEventListener('change', event => {
-    if (!event.target.matches('#g-answer-form select[data-field]')) return;
+  document.addEventListener('change', e => {
+    const f = e.target;
+    if (f.id === 'game-theme') { window.setSceneTheme?.(f.value); return; }
+    if (!f.matches('#g-answer-form select[data-field]')) return;
     state.drafts[state.chapter] ||= {};
-    state.drafts[state.chapter][event.target.dataset.field] = event.target.value;
-    save();
-    document.getElementById('g-feedback').textContent = '';
+    state.drafts[state.chapter][f.dataset.field] = f.value; save();
+    dialog.querySelector('.g-feedback').textContent = '';
   });
-
-  document.addEventListener('input', event => {
-    if (event.target.id !== 'g-notes-input') return;
-    state.notes = event.target.value; save();
-    document.getElementById('g-note-status').textContent = persistent ? 'Saved on this device.' : 'Device storage is unavailable. Notes last for this session.';
+  document.addEventListener('input', e => {
+    if (e.target.id !== 'g-notes-input') return;
+    state.notes = e.target.value; save();
+    dialog.querySelector('#g-note-status').textContent = persistent ? 'Saved on this device.' : 'Device storage unavailable. Notes last for this session.';
   });
-
-  document.addEventListener('submit', submitDeduction);
+  document.addEventListener('keydown', e => {
+    if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || !state?.started || dialog?.open ||
+      e.target.closest?.('input,textarea,select,[contenteditable="true"]')) return;
+    switch (e.key.toLowerCase()) {
+      case 'n': notebook(); break;
+      case 'f': fullscreen(); break;
+      case 'b': showBook(); break;
+      case 'escape': menu(); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+  document.addEventListener('submit',submitFinding);
+  document.addEventListener('fullscreenchange',syncFullscreen);
+  document.addEventListener('webkitfullscreenchange',syncFullscreen);
+  window.addEventListener('resize',() => { if (state?.started) scheduleFit(); });
+  window.addEventListener('ambiencechange',syncSound);
   window.openInvestigation = openInvestigation;
   window.openNotebook = notebook;
-  window.clearSavedInvestigation = () => { state = defaultState(); save(); returnToTitle(); };
+  window.clearSavedInvestigation = clearSaved;
   window.hasInvestigation = () => { load(); return state.started; };
 })();

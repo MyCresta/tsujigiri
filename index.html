@@ -3,93 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#171713">
-  <meta name="description" content="A cooperative murder mystery set in an Edo-period post town. Gather around one screen, examine the case file, and find the tsujigiri.">
+  <meta name="theme-color" content="#171916">
+  <meta name="description" content="An illustrated point-and-click mystery for two to four players sharing one screen. Investigate a death in an Edo-period post town.">
   <title>Tsujigiri — The Kageura Crossing</title>
   <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
-  <link rel="preload" href="./assets/title.webp" as="image" fetchpriority="high">
+  <link rel="preload" href="./assets/scenes/act1.webp" as="image" fetchpriority="high">
   <link rel="preload" href="./assets/fonts/cormorant-semibold.woff" as="font" type="font/woff" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=2583ce5832">
-  <link rel="stylesheet" href="./game.css?v=ab7ab6545e">
+  <link rel="stylesheet" href="./style.css?v=0c3c8da100">
+  <link rel="stylesheet" href="./game.css?v=f75ff38d08">
   <link rel="stylesheet" href="./route.css?v=2f0a18385f">
   <link rel="stylesheet" href="./paper.css?v=c8b40d3e3c">
+  <link rel="stylesheet" href="./panels.css?v=beb75e7afc">
   <script defer src="./route.js?v=104f7d1104"></script>
   <script defer src="./paper.js?v=10fb98cfef"></script>
-  <script defer src="./case.js?v=12b994b7c8"></script>
-  <script defer src="./game.js?v=40f44ed40b"></script>
-  <script defer src="./title.js?v=5bfd21c765"></script>
+  <script defer src="./case.js?v=305c682d5f"></script>
+  <script defer src="./scenes.js?v=9940fe3234"></script>
+  <script defer src="./game.js?v=08c21c4c63"></script>
+  <script defer src="./stage.js?v=21793fdd06"></script>
 </head>
 <body>
-<svg width="0" height="0" class="icon-set" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6c-2.4-1.6-6.2-2-9-1.2v14c2.9-.8 6.7-.3 9 1.2 2.4-1.5 6.1-2 9-1.2v-14c-2.8-.8-6.7-.4-9 1.2Z"/><path d="M12 6v14"/></symbol>
-  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M3 12h1m3-4v8m4-12v16m4-13v10m4-8v6m3-4v2"/></symbol>
-  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/></symbol>
-  <symbol id="i-min" viewBox="0 0 24 24"><path d="M4 9h5V4m6 0v5h5m0 6h-5v5m-6 0v-5H4"/></symbol>
-  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2.2c0-3.5 2.7-5.8 6-5.8s6 2.3 6 5.8V20M16 5a3 3 0 0 1 0 6m1 2c2.7.4 4 2.5 4 5v2"/></symbol>
-  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 7v5l3.4 2"/></symbol>
-  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><path d="m5 5 14 14M19 5 5 19"/></symbol>
-  <symbol id="i-place" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 0 1 14 0Z"/><circle cx="12" cy="10" r="2"/></symbol>
-  <symbol id="i-guide" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.8"/><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 2.1-2.7 2.3-2.7 4.2m0 2.2v.2"/></symbol>
-</svg>
-<section id="title-screen" aria-label="Title screen">
-  <div class="title-art" aria-hidden="true"></div>
-  <header class="title-head">
-    <div class="archive-brand"><img src="./assets/mark.svg" alt="" width="36" height="36"><span>Kageura Archives</span></div>
-    <div class="title-tools">
-      <button type="button" id="sound" aria-pressed="false"><svg class="ico"><use href="#i-sound"/></svg><span>Sound off</span></button>
-      <span class="tools-rule" aria-hidden="true"></span>
-      <button type="button" id="fullscreen" title="Enter fullscreen" aria-label="Enter fullscreen"><svg class="ico"><use href="#i-full"/></svg></button>
-    </div>
-  </header>
-  <main class="title-main">
-    <div class="title-copy">
-      <p class="title-eyebrow"><span aria-hidden="true"></span>A cooperative murder mystery</p>
-      <div class="title-lockup"><h1>Tsujigiri</h1><span class="title-seal" lang="ja" aria-label="Tsujigiri in Japanese">辻斬り</span></div>
-      <p class="case-subtitle">The Kageura Crossing</p>
-      <div class="title-ornament" aria-hidden="true"><i></i><b></b><i></i></div>
-      <p class="title-story">A town copyist lies dead at the red bridge. Gather around one screen, piece together the night, and find the tsujigiri before the morning relay leaves.</p>
-      <div class="title-actions">
-        <button class="enter-case" id="begin" type="button"><svg class="ico"><use href="#i-book"/></svg><span>Begin investigation</span></button>
-        <button class="guide-action" id="how" type="button"><svg class="ico"><use href="#i-guide"/></svg>How to play</button>
-      </div>
-      <div class="saved-case-options" id="saved-options" hidden><button type="button" id="new-case">Start a fresh case</button></div>
-    </div>
-  </main>
-  <footer class="title-foot">
-    <div class="title-facts" aria-label="Game details">
-      <span><svg class="ico"><use href="#i-people"/></svg>2–4 players</span>
-      <span><svg class="ico"><use href="#i-clock"/></svg>35–50 min</span>
-      <span><svg class="ico"><use href="#i-layers"/></svg>4 chapters</span>
-    </div>
-    <div class="title-location"><svg class="ico"><use href="#i-place"/></svg>Kageura, Japan <i aria-hidden="true"></i> Autumn, 1752</div>
-  </footer>
-</section>
-<main id="game" hidden aria-label="Investigation"></main>
-<dialog class="field-guide" id="guide" aria-labelledby="guide-title">
-  <div class="guide-head"><div class="guide-mark"><img src="./assets/mark.svg" alt="" width="29" height="29">Kageura Archives</div><button type="button" id="close-guide" aria-label="Close field guide" class="guide-close"><svg class="ico"><use href="#i-close"/></svg></button></div>
-  <div class="guide-inner">
-    <p class="guide-kicker">Field guide</p>
-    <h2 id="guide-title">How to play</h2>
-    <p class="guide-intro">Pull up a chair. You share one screen, one case file, and one decision at the end of each chapter.</p>
-    <ol class="guide-list">
-      <li><strong>Open the exhibits.</strong><span>Read the statements aloud. Study the maps, objects, and records together. Every clue you need is in the file.</span></li>
-      <li><strong>Trade observations.</strong><span>Let one player read while another keeps notes. Take turns navigating, checking distances, and questioning each other’s theory.</span></li>
-      <li><strong>Record your finding.</strong><span>Agree on an answer, then submit it. You can revisit earlier exhibits, ask for a hint, and revise a finding as often as you like.</span></li>
-    </ol>
-    <p class="guide-save"><svg class="ico"><use href="#i-book"/></svg>Your case and notebook save in this browser. Take as long as you need.</p>
-    <button class="enter-case guide-return" type="button" id="guide-return">Return to case cover</button>
-  </div>
-</dialog>
-<dialog class="field-guide" id="new-case-dialog" aria-labelledby="new-case-heading">
-  <div class="guide-inner reset-inner">
-    <p class="guide-kicker">Case archive</p>
-    <h2 id="new-case-heading">Start a fresh case?</h2>
-    <p>This will clear the current team’s findings, notebook, and pins from this browser.</p>
-    <div class="reset-actions"><button class="keep-case" id="keep-case" type="button">Keep current case</button><button type="button" class="enter-case" id="confirm-new">Clear and start fresh</button></div>
-  </div>
-</dialog>
-<p class="status-toast" role="status" id="title-status" hidden></p>
-<noscript><p class="noscript-message">Enable JavaScript to open the interactive case file.</p></noscript>
+  <main id="game" aria-label="Tsujigiri · The Kageura Crossing"></main>
+  <p class="stage-toast" id="stage-status" role="status" hidden></p>
+  <noscript><p class="stage-toast">Enable JavaScript to enter the scene.</p></noscript>
 </body>
 </html>
